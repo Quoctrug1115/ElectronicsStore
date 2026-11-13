@@ -1,0 +1,46 @@
+
+# =========================
+# Flutter - Test files
+# =========================
+
+# Ignore test directories
+/frontend/test/
+/frontend/tests/
+
+# Ignore Dart test files
+**/*_test.dart
+**/*.test.dart
+
+# =========================
+# Flutter generated files
+# =========================
+
+**/.dart_tool/
+**/build/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+
+# =========================
+# .NET / ASP.NET Core
+# =========================
+
+**/bin/
+**/obj/
+
+# Visual Studio
+.vs/
+
+# =========================
+# IDE
+# =========================
+
+.idea/
+.vscode/
+
+# =========================
+# OS
+# =========================
+
+.DS_Store
+Thumbs.db

@@ -1,6 +1,51 @@
-@backend_HostAddress = http://localhost:5202
+@baseUrl = http://localhost:5202
 
-GET {{backend_HostAddress}}/weatherforecast/
-Accept: application/json
+### 1. Đăng ký tài khoản khách hàng mới (Role: Member)
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
 
-###
+{
+  "fullName": "Nguyen Van A",
+  "email": "member1@gmail.com",
+  "password": "Password@123",
+  "phoneNumber": "0912345678"
+}
+
+### 2. Đăng nhập bằng tài khoản Member (Lưu token vào biến loginMember)
+# @name loginMember
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "member1@gmail.com",
+  "password": "Password@123"
+}
+
+### 3. Đăng nhập bằng tài khoản Admin mặc định (Lưu token vào biến loginAdmin)
+# @name loginAdmin
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@electronics.com",
+  "password": "Admin@123"
+}
+
+### 4. Test quyền Admin bằng token Admin (Kỳ vọng: 200 OK)
+GET {{baseUrl}}/api/auth/admin-only
+Authorization: Bearer {{loginAdmin.response.body.accessToken}}
+
+### 5. Test quyền Admin bằng token Member (Kỳ vọng: 403 Forbidden)
+GET {{baseUrl}}/api/auth/admin-only
+Authorization: Bearer {{loginMember.response.body.accessToken}}
+
+### 6. Đổi mật khẩu (Kỳ vọng: 200 OK)
+POST {{baseUrl}}/api/auth/change-password
+Content-Type: application/json
+Authorization: Bearer {{loginMember.response.body.accessToken}}
+
+{
+  "oldPassword": "Password@123",
+  "newPassword": "NewPassword@123",
+  "confirmNewPassword": "NewPassword@123"
+}

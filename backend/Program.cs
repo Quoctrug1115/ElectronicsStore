@@ -1,8 +1,9 @@
+using System.Security.Claims;
 using System.Text;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
 using backend.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,31 +12,52 @@ builder.Services.AddDbContext<ElectronicsStoreContext>(p => p.UseSqlServer(conne
 // builder.Services.AddScoped<SiteProvider>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddControllers();
-builder.Services.AddAuthentication( p =>
+
+builder.Services.AddAuthentication(p =>
 {
     p.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
     p.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-}).AddCookie().AddJwtBearer(p =>
+})
+.AddCookie()
+.AddJwtBearer(p =>
 {
     p.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuerSigningKey = true,
+        ValidateIssuer = true,
+        ValidateAudience = true,
         ValidIssuer = builder.Configuration["Jwt:Issuer"],
         ValidAudience = builder.Configuration["Jwt:Audience"],
         ValidateLifetime = true,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(builder.Configuration["Jwt:Key"] ?? throw new KeyNotFoundException("Jwt:Key")))
+        IssuerSigningKey = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"] ?? throw new KeyNotFoundException("Jwt:Key"))
+        ),
+        RoleClaimType = ClaimTypes.Role,
+        NameClaimType = ClaimTypes.NameIdentifier
     };
 });
+
+builder.Services.AddAuthorization();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("FlutterPolicy", policy =>
     {
-        policy.WithOrigins("http://localhost:5259").AllowAnyHeader().AllowAnyMethod();
+        policy.WithOrigins("http://localhost:5259")
+              .AllowAnyHeader()
+              .AllowAnyMethod();
     });
 });
+
 var app = builder.Build();
+
+// Tạo sẵn tài khoản Admin (admin@electronics.com / Admin@123)
+await DbSeeder.SeedAdminAsync(app.Services);
+
+app.UseStaticFiles();
+app.UseCors("FlutterPolicy");
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseStaticFiles();
 app.MapControllers();
+
 app.Run();

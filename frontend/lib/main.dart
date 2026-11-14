@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
+import 'core/token_storage.dart';
 import 'screens/auth/login_screen.dart';
+import 'screens/home/admin_home.dart';
+import 'screens/home/member_home.dart';
 
 void main() {
   runApp(const ElectronicsStoreApp());
@@ -18,7 +21,54 @@ class ElectronicsStoreApp extends StatelessWidget {
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
       ),
-      home: const LoginScreen(),
+      home: const AuthGate(),
     );
+  }
+}
+
+class AuthGate extends StatefulWidget {
+  const AuthGate({super.key});
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  bool _loading = true;
+  String? _route;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkToken();
+  }
+
+  Future<void> _checkToken() async {
+    final token = await TokenStorage.getToken();
+    final roles = await TokenStorage.getRoles();
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+      _route = token != null
+          ? (roles.contains('Admin') ? '/admin' : '/member')
+          : '/login';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    switch (_route) {
+      case '/admin':
+        return const AdminHome();
+      case '/member':
+        return const MemberHome();
+      default:
+        return const LoginScreen();
+    }
   }
 }

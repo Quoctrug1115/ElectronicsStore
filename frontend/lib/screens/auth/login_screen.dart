@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../core/token_storage.dart';
 import '../../models/auth_models.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/error_banner.dart';
-import 'logged_in_test_screen.dart';
+import '../home/admin_home.dart';
+import '../home/member_home.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -50,12 +52,20 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       if (!mounted) return;
 
-      // TODO (Lê Thịnh): Lưu token vào flutter_secure_storage, giải mã JWT lấy Claim Role và điều hướng sang AdminHome / MemberHome
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => LoggedInTestScreen(authResponse: result),
-        ),
-      );
+      await TokenStorage.saveToken(result.accessToken);
+      await TokenStorage.saveRefreshToken(result.refreshToken);
+      await TokenStorage.saveRoles(result.user.roles);
+
+      if (!mounted) return;
+      if (result.user.roles.contains('Admin')) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const AdminHome()),
+        );
+      } else {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const MemberHome()),
+        );
+      }
     } on ApiException catch (e) {
       if (mounted) setState(() => _errorMessage = e.message);
     } finally {

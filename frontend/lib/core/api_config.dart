@@ -11,4 +11,7 @@ class ApiConfig {
   static const String register = '/api/auth/register';
   static const String login = '/api/auth/login';
   static const String changePassword = '/api/auth/change-password';
+  static const String categories = '/api/categories';
+  static const String brands = '/api/brands';
+  static const String products = '/api/products';
 }

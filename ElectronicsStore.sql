@@ -1,12 +1,7 @@
--- Active: 1793865868357@@127.0.0.1@1433@master
--- =============================================
--- ELECTRONICS STORE DATABASE (bản tổng hợp hoàn chỉnh)
--- Database: SQL Server
--- =============================================
+-- Active: 1794569562511@@127.0.0.1@1433@ElectronicsStore
 
 IF DB_ID('ElectronicsStore') IS NULL
     CREATE DATABASE ElectronicsStore;
-GO
 
 USE ElectronicsStore;
 GO
@@ -613,3 +608,5 @@ GO
 -- =============================================
 -- END OF SCRIPT
 -- =============================================
+
+select * from Users

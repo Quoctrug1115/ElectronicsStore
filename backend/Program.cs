@@ -7,9 +7,20 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
-string? connectionString = builder.Configuration.GetConnectionString("ElectronicsStore");
-builder.Services.AddDbContext<ElectronicsStoreContext>(p => p.UseSqlServer(connectionString));
-// builder.Services.AddScoped<SiteProvider>();
+// 1. Chọn SQLite hoặc SQL Server dựa theo cấu hình UseSqlite
+bool useSqlite = builder.Configuration.GetValue<bool>("UseSqlite");
+
+if (useSqlite)
+{
+    string? sqliteConn = builder.Configuration.GetConnectionString("SqliteConnection");
+    builder.Services.AddDbContext<ElectronicsStoreContext>(p => p.UseSqlite(sqliteConn));
+}
+else
+{
+    string? sqlServerConn = builder.Configuration.GetConnectionString("ElectronicsStore");
+    builder.Services.AddDbContext<ElectronicsStoreContext>(p => p.UseSqlServer(sqlServerConn));
+}
+
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddControllers();
 
@@ -51,8 +62,8 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Tạo sẵn tài khoản Admin (admin@electronics.com / Admin@123)
-await DbSeeder.SeedAdminAsync(app.Services);
+// Khởi tạo bảng (nếu dùng SQLite) và seed dữ liệu mẫu
+await DbSeeder.SeedAsync(app.Services, useSqlite);
 
 app.UseStaticFiles();
 app.UseCors("FlutterPolicy");

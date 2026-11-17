@@ -11,6 +11,8 @@ public class ElectronicsStoreContext : DbContext
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<Category> Categories => Set<Category>();
+    public DbSet<Product> Products => Set<Product>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -20,7 +22,7 @@ public class ElectronicsStoreContext : DbContext
         {
             entity.HasIndex(u => u.Email)
                   .IsUnique()
-                  .HasFilter("[IsDeleted] = 0");
+                  .HasFilter("IsDeleted = 0");
         });
 
         modelBuilder.Entity<UserRole>(entity =>
@@ -43,6 +45,22 @@ public class ElectronicsStoreContext : DbContext
                   .WithMany(u => u.RefreshTokens)
                   .HasForeignKey(rt => rt.UserId)
                   .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Category>(entity =>
+        {
+            entity.HasOne(c => c.Parent)
+                  .WithMany(c => c.Children)
+                  .HasForeignKey(c => c.ParentId)
+                  .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Product>(entity =>
+        {
+            entity.HasOne(p => p.Category)
+                  .WithMany(c => c.Products)
+                  .HasForeignKey(p => p.CategoryId)
+                  .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

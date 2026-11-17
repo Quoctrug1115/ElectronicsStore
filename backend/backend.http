@@ -5,10 +5,10 @@ POST {{baseUrl}}/api/auth/register
 Content-Type: application/json
 
 {
-  "fullName": "Nguyen Van A",
-  "email": "member1@gmail.com",
-  "password": "Password@123",
-  "phoneNumber": "0912345678"
+  "fullName": "Nguyen Van B",
+  "email": "member2@gmail.com",
+  "password": "123456",
+  "phoneNumber": "0912345677"
 }
 
 ### 2. Đăng nhập bằng tài khoản Member (Lưu token vào biến loginMember)
@@ -17,8 +17,8 @@ POST {{baseUrl}}/api/auth/login
 Content-Type: application/json
 
 {
-  "email": "member1@gmail.com",
-  "password": "Password@123"
+  "email": "member2@gmail.com",
+  "password": "123456"
 }
 
 ### 3. Đăng nhập bằng tài khoản Admin mặc định (Lưu token vào biến loginAdmin)
@@ -49,3 +49,49 @@ Authorization: Bearer {{loginMember.response.body.accessToken}}
   "newPassword": "NewPassword@123",
   "confirmNewPassword": "NewPassword@123"
 }
+
+### 7. Lấy danh sách tất cả danh mục
+GET {{baseUrl}}/api/categories
+
+### 8. Thêm danh mục mới (Form Data - Token Admin)
+# @name createCategory
+POST {{baseUrl}}/api/categories
+Authorization: Bearer {{loginAdmin.response.body.accessToken}}
+Content-Type: multipart/form-data; boundary=Boundary123
+
+--Boundary123
+Content-Disposition: form-data; name="Name"
+
+Đồng hồ thông minh
+--Boundary123
+Content-Disposition: form-data; name="Description"
+
+Các dòng Smartwatch Apple, Samsung, Garmin
+--Boundary123
+Content-Disposition: form-data; name="IsActive"
+
+true
+--Boundary123--
+
+### 9. Cập nhật danh mục
+PUT {{baseUrl}}/api/categories/{{createCategory.response.body.data.id}}
+Authorization: Bearer {{loginAdmin.response.body.accessToken}}
+Content-Type: multipart/form-data; boundary=Boundary123
+
+--Boundary123
+Content-Disposition: form-data; name="Name"
+
+Smartwatch & Vòng đeo tay
+--Boundary123
+Content-Disposition: form-data; name="Description"
+
+Mô tả đã cập nhật
+--Boundary123
+Content-Disposition: form-data; name="IsActive"
+
+true
+--Boundary123--
+
+### 10. Xóa danh mục
+DELETE {{baseUrl}}/api/categories/{{createCategory.response.body.data.id}}
+Authorization: Bearer {{loginAdmin.response.body.accessToken}}

@@ -22,6 +22,7 @@ else
 }
 
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<backend.Services.FileStorageService>();
 builder.Services.AddControllers();
 
 builder.Services.AddAuthentication(p =>

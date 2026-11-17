@@ -13,4 +13,8 @@ public class Product
     public DateTime? UpdatedAt { get; set; }
 
     public Category Category { get; set; } = null!;
+    public Brand Brand { get; set; } = null!;
+    public ICollection<ProductVariant> Variants { get; set; } = new List<ProductVariant>();
+    public ICollection<ProductImage> Images { get; set; } = new List<ProductImage>();
+    public ICollection<ProductSpecification> Specifications { get; set; } = new List<ProductSpecification>();
 }

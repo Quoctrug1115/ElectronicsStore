@@ -12,7 +12,11 @@ public class ElectronicsStoreContext : DbContext
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Category> Categories => Set<Category>();
+    public DbSet<Brand> Brands => Set<Brand>();
     public DbSet<Product> Products => Set<Product>();
+    public DbSet<ProductVariant> ProductVariants => Set<ProductVariant>();
+    public DbSet<ProductImage> ProductImages => Set<ProductImage>();
+    public DbSet<ProductSpecification> ProductSpecifications => Set<ProductSpecification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -61,6 +65,42 @@ public class ElectronicsStoreContext : DbContext
                   .WithMany(c => c.Products)
                   .HasForeignKey(p => p.CategoryId)
                   .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(p => p.Brand)
+                  .WithMany(b => b.Products)
+                  .HasForeignKey(p => p.BrandId)
+                  .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ProductVariant>(entity =>
+        {
+            entity.HasIndex(v => v.SKU).IsUnique();
+
+            entity.HasOne(v => v.Product)
+                  .WithMany(p => p.Variants)
+                  .HasForeignKey(v => v.ProductId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ProductImage>(entity =>
+        {
+            // Mỗi sản phẩm chỉ có tối đa 1 ảnh chính (tương thích cả SQLite & SQL Server)
+            entity.HasIndex(i => i.ProductId)
+                  .IsUnique()
+                  .HasFilter("IsPrimary = 1");
+
+            entity.HasOne(i => i.Product)
+                  .WithMany(p => p.Images)
+                  .HasForeignKey(i => i.ProductId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ProductSpecification>(entity =>
+        {
+            entity.HasOne(s => s.Product)
+                  .WithMany(p => p.Specifications)
+                  .HasForeignKey(s => s.ProductId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

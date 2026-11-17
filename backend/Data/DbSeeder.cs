@@ -15,7 +15,6 @@ public static class DbSeeder
             await context.Database.EnsureCreatedAsync();
         }
 
-        // 1. Seed Roles
         if (!await context.Roles.AnyAsync())
         {
             context.Roles.AddRange(
@@ -25,7 +24,6 @@ public static class DbSeeder
             await context.SaveChangesAsync();
         }
 
-        // 2. Seed tài khoản Admin
         const string adminEmail = "admin@electronics.com";
         if (!await context.Users.AnyAsync(u => u.Email == adminEmail && !u.IsDeleted))
         {
@@ -54,15 +52,21 @@ public static class DbSeeder
             await context.SaveChangesAsync();
         }
 
-        // 3. Seed Categories & 1 Product mẫu để test ràng buộc xóa
+        if (!await context.Brands.AnyAsync())
+        {
+            context.Brands.AddRange(
+                new Brand { Name = "Apple", Description = "Thương hiệu Apple" },
+                new Brand { Name = "Samsung", Description = "Thương hiệu Samsung" },
+                new Brand { Name = "Dell", Description = "Thương hiệu Dell" },
+                new Brand { Name = "ASUS", Description = "Thương hiệu ASUS" },
+                new Brand { Name = "Lenovo", Description = "Thương hiệu Lenovo" }
+            );
+            await context.SaveChangesAsync();
+        }
+
         if (!await context.Categories.AnyAsync())
         {
-            var phoneCategory = new Category
-            {
-                Name = "Điện thoại",
-                Description = "Các dòng điện thoại thông minh"
-            };
-
+            var phoneCategory = new Category { Name = "Điện thoại", Description = "Các dòng điện thoại thông minh" };
             context.Categories.AddRange(
                 phoneCategory,
                 new Category { Name = "Laptop", Description = "Máy tính xách tay" },
@@ -72,18 +76,27 @@ public static class DbSeeder
             );
             await context.SaveChangesAsync();
 
-            // Tạo sẵn 1 sản phẩm thuộc danh mục "Điện thoại" để test AnyAsync chặn xóa
-            if (!await context.Products.AnyAsync())
+            var appleBrand = await context.Brands.FirstAsync(b => b.Name == "Apple");
+            var sampleProduct = new Product
             {
-                context.Products.Add(new Product
+                CategoryId = phoneCategory.Id,
+                BrandId = appleBrand.Id,
+                Name = "iPhone 16 Pro Max",
+                Description = "Chip A18 Pro, màn hình Super Retina XDR 6.9 inch",
+                Variants = new List<ProductVariant>
                 {
-                    CategoryId = phoneCategory.Id,
-                    BrandId = 1,
-                    Name = "iPhone 16 Pro Max",
-                    Description = "Sản phẩm mẫu kiểm tra ràng buộc danh mục"
-                });
-                await context.SaveChangesAsync();
-            }
+                    new()
+                    {
+                        SKU = "IP16PM-256-TI",
+                        Color = "Titan Tự Nhiên",
+                        Storage = "256GB",
+                        Price = 34990000,
+                        CompareAtPrice = 36990000
+                    }
+                }
+            };
+            context.Products.Add(sampleProduct);
+            await context.SaveChangesAsync();
         }
     }
 }

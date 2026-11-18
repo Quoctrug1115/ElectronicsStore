@@ -5,15 +5,10 @@ namespace backend.Data;
 
 public static class DbSeeder
 {
-    public static async Task SeedAsync(IServiceProvider serviceProvider, bool isSqlite)
+    public static async Task SeedAsync(IServiceProvider serviceProvider)
     {
         using var scope = serviceProvider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ElectronicsStoreContext>();
-
-        if (isSqlite)
-        {
-            await context.Database.EnsureCreatedAsync();
-        }
 
         if (!await context.Roles.AnyAsync())
         {

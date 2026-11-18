@@ -7,19 +7,9 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Chọn SQLite hoặc SQL Server dựa theo cấu hình UseSqlite
-bool useSqlite = builder.Configuration.GetValue<bool>("UseSqlite");
-
-if (useSqlite)
-{
-    string? sqliteConn = builder.Configuration.GetConnectionString("SqliteConnection");
-    builder.Services.AddDbContext<ElectronicsStoreContext>(p => p.UseSqlite(sqliteConn));
-}
-else
-{
-    string? sqlServerConn = builder.Configuration.GetConnectionString("ElectronicsStore");
-    builder.Services.AddDbContext<ElectronicsStoreContext>(p => p.UseSqlServer(sqlServerConn));
-}
+// 1. Kết nối SQL Server
+string? sqlServerConn = builder.Configuration.GetConnectionString("ElectronicsStore");
+builder.Services.AddDbContext<ElectronicsStoreContext>(p => p.UseSqlServer(sqlServerConn));
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<backend.Services.FileStorageService>();
@@ -63,8 +53,8 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Khởi tạo bảng (nếu dùng SQLite) và seed dữ liệu mẫu
-await DbSeeder.SeedAsync(app.Services, useSqlite);
+// Seed dữ liệu mẫu
+await DbSeeder.SeedAsync(app.Services);
 
 app.UseStaticFiles();
 app.UseCors("FlutterPolicy");

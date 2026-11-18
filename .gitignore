@@ -44,3 +44,8 @@
 
 .DS_Store
 Thumbs.db
+
+# SQLite local (backend chi dung SQL Server)
+*.db
+*.db-shm
+*.db-wal

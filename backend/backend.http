@@ -95,3 +95,83 @@ true
 ### 10. Xóa danh mục
 DELETE {{baseUrl}}/api/categories/{{createCategory.response.body.data.id}}
 Authorization: Bearer {{loginAdmin.response.body.accessToken}}
+
+### 11. Lấy danh sách sản phẩm phân trang
+GET {{baseUrl}}/api/products?pageIndex=1&pageSize=5&sortBy=newest
+
+### 12. Thêm sản phẩm mới kèm upload nhiều ảnh (multipart/form-data)
+# @name createProduct
+POST {{baseUrl}}/api/products
+Authorization: Bearer {{loginAdmin.response.body.accessToken}}
+Content-Type: multipart/form-data; boundary=ProductBoundary
+
+--ProductBoundary
+Content-Disposition: form-data; name="CategoryId"
+
+2
+--ProductBoundary
+Content-Disposition: form-data; name="BrandId"
+
+3
+--ProductBoundary
+Content-Disposition: form-data; name="Name"
+
+Dell XPS 13 9340
+--ProductBoundary
+Content-Disposition: form-data; name="Description"
+
+Laptop doanh nhân siêu mỏng nhẹ Intel Core Ultra 7
+--ProductBoundary
+Content-Disposition: form-data; name="SKU"
+
+DELL-XPS13-U7
+--ProductBoundary
+Content-Disposition: form-data; name="Color"
+
+Bạc Platinum
+--ProductBoundary
+Content-Disposition: form-data; name="Storage"
+
+16GB / 512GB SSD
+--ProductBoundary
+Content-Disposition: form-data; name="Price"
+
+42500000
+--ProductBoundary
+Content-Disposition: form-data; name="ImageFiles"; filename="test1.jpg"
+Content-Type: image/jpeg
+
+< ./nen1.jpg
+--ProductBoundary--
+
+### 13. Sửa sản phẩm & Upload ảnh mới (Kiểm tra thư mục wwwroot/images/products sẽ thấy file cũ tự động bị xóa)
+PUT {{baseUrl}}/api/products/{{createProduct.response.body.productId}}
+Authorization: Bearer {{loginAdmin.response.body.accessToken}}
+Content-Type: multipart/form-data; boundary=ProductBoundary
+
+--ProductBoundary
+Content-Disposition: form-data; name="CategoryId"
+
+2
+--ProductBoundary
+Content-Disposition: form-data; name="BrandId"
+
+3
+--ProductBoundary
+Content-Disposition: form-data; name="Name"
+
+Dell XPS 13 9340 (Bản 2026)
+--ProductBoundary
+Content-Disposition: form-data; name="Price"
+
+41000000
+--ProductBoundary
+Content-Disposition: form-data; name="ImageFiles"; filename="test2.jpg"
+Content-Type: image/jpeg
+
+< ./test2.jpg
+--ProductBoundary--
+
+### 14. Xóa sản phẩm (Kiểm tra wwwroot/images/products sẽ sạch bóng file test2.jpg)
+DELETE {{baseUrl}}/api/products/{{createProduct.response.body.productId}}
+Authorization: Bearer {{loginAdmin.response.body.accessToken}}

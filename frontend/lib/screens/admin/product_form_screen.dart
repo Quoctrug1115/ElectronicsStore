@@ -86,8 +86,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         _price = firstVariant?.price ?? 0;
         _priceController.text = _price.toStringAsFixed(0);
         _compareAtPrice = firstVariant?.compareAtPrice;
-        _compareAtPriceController.text =
-            _compareAtPrice != null ? _compareAtPrice!.toStringAsFixed(0) : '';
+        _compareAtPriceController.text = _compareAtPrice != null
+            ? _compareAtPrice!.toStringAsFixed(0)
+            : '';
         _brandId = detail.brandId;
         _isActive = detail.isActive;
         _existingImages = detail.images;
@@ -154,10 +155,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final price = double.tryParse(_priceController.text.trim()) ?? 0;
-    final compareAtPrice =
-        _compareAtPriceController.text.trim().isEmpty
-            ? null
-            : double.tryParse(_compareAtPriceController.text.trim());
+    final compareAtPrice = _compareAtPriceController.text.trim().isEmpty
+        ? null
+        : double.tryParse(_compareAtPriceController.text.trim());
 
     setState(() {
       _saving = true;
@@ -202,7 +202,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            _isEdit ? 'Cập nhật sản phẩm thành công.' : 'Thêm sản phẩm thành công.',
+            _isEdit
+                ? 'Cập nhật sản phẩm thành công.'
+                : 'Thêm sản phẩm thành công.',
           ),
         ),
       );
@@ -221,9 +223,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_isEdit ? 'Sửa sản phẩm' : 'Thêm sản phẩm'),
-      ),
+      appBar: AppBar(title: Text(_isEdit ? 'Sửa sản phẩm' : 'Thêm sản phẩm')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -245,25 +245,25 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                         border: OutlineInputBorder(),
                       ),
                       value: _categoryId,
-                      items: [
-                        const DropdownMenuItem<int?>(
-                          value: null,
-                          child: Text('(Chọn danh mục)'),
-                        ),
-                      ]..addAll(
-                          _categories.map(
-                            (c) => DropdownMenuItem<int?>(
-                              value: c.id,
-                              child: Text(c.name),
+                      items:
+                          [
+                            const DropdownMenuItem<int?>(
+                              value: null,
+                              child: Text('(Chọn danh mục)'),
+                            ),
+                          ]..addAll(
+                            _categories.map(
+                              (c) => DropdownMenuItem<int?>(
+                                value: c.id,
+                                child: Text(c.name),
+                              ),
                             ),
                           ),
-                        ),
                       onChanged: _saving
                           ? null
                           : (v) => setState(() => _categoryId = v),
-                      validator: (v) => v == null
-                          ? 'Vui lòng chọn danh mục'
-                          : null,
+                      validator: (v) =>
+                          v == null ? 'Vui lòng chọn danh mục' : null,
                     ),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<int?>(
@@ -273,25 +273,25 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                         border: OutlineInputBorder(),
                       ),
                       value: _brandId,
-                      items: [
-                        const DropdownMenuItem<int?>(
-                          value: null,
-                          child: Text('(Chọn thương hiệu)'),
-                        ),
-                      ]..addAll(
-                          _brands.map(
-                            (b) => DropdownMenuItem<int?>(
-                              value: b.id,
-                              child: Text(b.name),
+                      items:
+                          [
+                            const DropdownMenuItem<int?>(
+                              value: null,
+                              child: Text('(Chọn thương hiệu)'),
+                            ),
+                          ]..addAll(
+                            _brands.map(
+                              (b) => DropdownMenuItem<int?>(
+                                value: b.id,
+                                child: Text(b.name),
+                              ),
                             ),
                           ),
-                        ),
                       onChanged: _saving
                           ? null
                           : (v) => setState(() => _brandId = v),
-                      validator: (v) => v == null
-                          ? 'Vui lòng chọn thương hiệu'
-                          : null,
+                      validator: (v) =>
+                          v == null ? 'Vui lòng chọn thương hiệu' : null,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -304,8 +304,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       ),
                       validator: (value) =>
                           (value == null || value.trim().isEmpty)
-                              ? 'Vui lòng nhập tên sản phẩm'
-                              : null,
+                          ? 'Vui lòng nhập tên sản phẩm'
+                          : null,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -318,8 +318,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       ),
                       validator: (value) =>
                           (value == null || value.trim().isEmpty)
-                              ? 'Vui lòng nhập mã SKU'
-                              : null,
+                          ? 'Vui lòng nhập mã SKU'
+                          : null,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -335,8 +335,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       ),
                       validator: (value) =>
                           (double.tryParse(value?.trim() ?? '') == null)
-                              ? 'Vui lòng nhập giá bán hợp lệ'
-                              : null,
+                          ? 'Vui lòng nhập giá bán hợp lệ'
+                          : null,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -346,7 +346,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                         decimal: true,
                       ),
                       decoration: const InputDecoration(
-                        labelText: 'Giá gốc/kmã (đ) (tùy chọn)',
+                        labelText: 'Giá gốc (tùy chọn)',
                         prefixIcon: Icon(Icons.attach_money),
                         border: OutlineInputBorder(),
                       ),
@@ -407,10 +407,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     if (_existingImages.isNotEmpty) ...[
                       const Text(
                         'Ảnh hiện tại (giữ lại khi không upload ảnh mới)',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                       const SizedBox(height: 8),
                       SizedBox(
@@ -439,8 +436,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                                   fit: BoxFit.cover,
                                   width: 80,
                                   height: 80,
-                                  errorBuilder: (_, __, ___) =>
-                                      const Center(
+                                  errorBuilder: (_, __, ___) => const Center(
                                     child: Icon(
                                       Icons.image_not_supported,
                                       size: 28,
@@ -462,10 +458,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     if (_newImages.isEmpty)
                       const Text(
                         'Chưa chọn ảnh nào',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
                       )
                     else
                       SizedBox(
@@ -513,8 +506,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                                         size: 16,
                                         color: Colors.white,
                                       ),
-                                      onPressed: () =>
-                                          _removeNewImage(i),
+                                      onPressed: () => _removeNewImage(i),
                                       padding: EdgeInsets.zero,
                                     ),
                                   ),

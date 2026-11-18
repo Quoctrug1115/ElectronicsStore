@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 import '../../models/category_models.dart';
 import '../../services/category_service.dart';
-import '../../widgets/error_banner.dart';
+import '../../widgets/admin_widgets.dart';
 import 'category_form_screen.dart';
 
 class CategoryListScreen extends StatefulWidget {
@@ -21,6 +21,8 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
   List<CategoryResponse> _categories = [];
   bool _isLoading = true;
   String? _errorMessage;
+  String _query = '';
+  bool? _status; // null = tất cả
 
   @override
   void initState() {
@@ -50,27 +52,12 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
   }
 
   Future<void> _deleteCategory(int id, String name) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Xác nhận xóa'),
-        content: Text('Bạn có chắc chắn muốn xóa danh mục "$name"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Hủy'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: const Text('Xóa'),
-          ),
-        ],
-      ),
+    final confirmed = await confirmDelete(
+      context,
+      entity: 'danh mục',
+      name: name,
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
 
     setState(() => _isLoading = true);
     try {
@@ -105,150 +92,151 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
     _loadCategories();
   }
 
+  List<CategoryResponse> get _filtered {
+    final q = _query.trim().toLowerCase();
+    return _categories.where((c) {
+      if (_status != null && c.isActive != _status) return false;
+      return q.isEmpty || c.name.toLowerCase().contains(q);
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final items = _filtered;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Quản lý Danh mục'),
-        automaticallyImplyLeading: false,
-      ),
-      body: RefreshIndicator(
-        onRefresh: _loadCategories,
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _errorMessage != null && _categories.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        ErrorBanner(message: _errorMessage!),
-                        const SizedBox(height: 16),
-                        FilledButton(
-                          onPressed: _loadCategories,
-                          child: const Text('Thử lại'),
-                        ),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(12),
-                    itemCount: _categories.length,
-                    itemBuilder: (context, index) {
-                      final c = _categories[index];
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        child: ListTile(
-                          leading: c.fullImageUrl.isNotEmpty
-                              ? ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(
-                                    c.fullImageUrl,
-                                    width: 56,
-                                    height: 56,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) =>
-                                        const Icon(Icons.category, size: 40),
-                                  ),
-                                )
-                              : const Icon(Icons.category, size: 40),
-                          title: Text(
-                            c.name,
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: 4),
-                              if (c.description != null &&
-                                  c.description!.isNotEmpty)
-                                Text(
-                                  c.description!,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
-                                  ),
-                                ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: c.isActive
-                                          ? Colors.green.shade100
-                                          : Colors.grey.shade200,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      c.isActive ? 'Hoạt động' : 'Khóa',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: c.isActive
-                                            ? Colors.green.shade800
-                                            : Colors.grey.shade700,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    '${c.productCount} sản phẩm',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
-                                    ),
-                                  ),
-                                  if (c.parentName != null &&
-                                      c.parentName!.isNotEmpty) ...[
-                                    const SizedBox(width: 10),
-                                    Text(
-                                      'Cha: ${c.parentName}',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ],
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                tooltip: 'Sửa',
-                                icon: const Icon(Icons.edit),
-                                onPressed: () => _openForm(category: c),
-                              ),
-                              IconButton(
-                                tooltip: 'Xóa',
-                                icon: const Icon(Icons.delete),
-                                color: Theme.of(context).colorScheme.error,
-                                onPressed: () =>
-                                    _deleteCategory(c.id, c.name),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
+      appBar: AppBar(title: const Text('Danh mục')),
+      body: Column(
+        children: [
+          StatusFilterBar(
+            hint: 'Tìm danh mục',
+            status: _status,
+            onQueryChanged: (v) => setState(() => _query = v),
+            onStatusChanged: (v) => setState(() => _status = v),
+          ),
+          if (!_isLoading && _errorMessage == null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '${items.length} danh mục',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
+                ),
+              ),
+            ),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _loadCategories,
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _errorMessage != null && _categories.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [
+                            ErrorRetry(
+                              message: _errorMessage!,
+                              onRetry: _loadCategories,
+                            ),
+                          ],
+                        )
+                      : items.isEmpty
+                          ? ListView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              children: const [
+                                EmptyState(
+                                  icon: Icons.category_outlined,
+                                  message: 'Không có danh mục phù hợp.',
+                                ),
+                              ],
+                            )
+                          : ListView.separated(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding:
+                                  const EdgeInsets.fromLTRB(16, 4, 16, 96),
+                              itemCount: items.length,
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(height: 10),
+                              itemBuilder: (context, i) =>
+                                  _buildRow(items[i]),
+                            ),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        // heroTag riêng: các tab nằm cùng IndexedStack nên tag mặc định sẽ bị trùng.
+        heroTag: 'fab_category',
         onPressed: () => _openForm(),
         icon: const Icon(Icons.add),
         label: const Text('Thêm danh mục'),
+      ),
+    );
+  }
+
+  Widget _buildRow(CategoryResponse c) {
+    final theme = Theme.of(context);
+    final muted = theme.colorScheme.onSurfaceVariant;
+    final meta = <String>[
+      '${c.productCount} sản phẩm',
+      if (c.parentName != null && c.parentName!.isNotEmpty)
+        'Cha: ${c.parentName}',
+    ].join(' · ');
+
+    return Card(
+      child: InkWell(
+        onTap: () => _openForm(category: c),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
+          child: Row(
+            children: [
+              AdminThumb(url: c.fullImageUrl, icon: Icons.category_outlined),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      c.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
+                    ),
+                    if (c.description != null && c.description!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          c.description!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: muted, fontSize: 13),
+                        ),
+                      ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        StatusPill(isActive: c.isActive),
+                        Text(meta, style: TextStyle(color: muted, fontSize: 12)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              RowMenu(
+                onEdit: () => _openForm(category: c),
+                onDelete: () => _deleteCategory(c.id, c.name),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

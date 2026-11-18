@@ -6,7 +6,8 @@ import '../../models/product_models.dart';
 import '../../services/brand_service.dart';
 import '../../services/category_service.dart';
 import '../../services/product_service.dart';
-import '../../widgets/error_banner.dart';
+import '../../core/format.dart';
+import '../../widgets/admin_widgets.dart';
 import 'product_form_screen.dart';
 
 class ProductListScreen extends StatefulWidget {
@@ -69,27 +70,12 @@ class _ProductListScreenState extends State<ProductListScreen> {
   }
 
   Future<void> _deleteProduct(int id, String name) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Xác nhận xóa'),
-        content: Text('Bạn có chắc chắn muốn xóa sản phẩm "$name"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Hủy'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: const Text('Xóa'),
-          ),
-        ],
-      ),
+    final confirmed = await confirmDelete(
+      context,
+      entity: 'sản phẩm',
+      name: name,
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
 
     setState(() => _isLoading = true);
     try {
@@ -128,39 +114,36 @@ class _ProductListScreenState extends State<ProductListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Quản lý Sản phẩm'),
-        automaticallyImplyLeading: false,
-      ),
-      body: RefreshIndicator(
-        onRefresh: _loadData,
-        child: Column(
-          children: [
-            _buildFilterBar(),
-            Expanded(
+      appBar: AppBar(title: const Text('Sản phẩm')),
+      body: Column(
+        children: [
+          _buildFilterBar(),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _loadData,
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _errorMessage != null && _paged == null
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              ErrorBanner(message: _errorMessage!),
-                              const SizedBox(height: 16),
-                              FilledButton(
-                                onPressed: _loadData,
-                                child: const Text('Thử lại'),
-                              ),
-                            ],
-                          ),
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [
+                            ErrorRetry(
+                              message: _errorMessage!,
+                              onRetry: _loadData,
+                            ),
+                          ],
                         )
                       : _buildProductList(),
             ),
-            _buildPagination(),
-          ],
-        ),
+          ),
+        ],
       ),
+      // Đặt thanh phân trang ở bottomNavigationBar để nút "Thêm sản phẩm"
+      // tự nổi phía trên, không che nút chuyển trang.
+      bottomNavigationBar: _buildPagination(),
       floatingActionButton: FloatingActionButton.extended(
+        // heroTag riêng: các tab nằm cùng IndexedStack nên tag mặc định sẽ bị trùng.
+        heroTag: 'fab_product',
         onPressed: () => _openForm(),
         icon: const Icon(Icons.add),
         label: const Text('Thêm sản phẩm'),
@@ -170,17 +153,19 @@ class _ProductListScreenState extends State<ProductListScreen> {
 
   Widget _buildFilterBar() {
     return Padding(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           TextField(
             enabled: !_isLoading,
+            textInputAction: TextInputAction.search,
             decoration: InputDecoration(
-              labelText: 'Tìm kiếm sản phẩm',
+              hintText: 'Tìm sản phẩm theo tên',
               prefixIcon: const Icon(Icons.search),
-              border: const OutlineInputBorder(),
               suffixIcon: _search.isNotEmpty
                   ? IconButton(
+                      tooltip: 'Xóa tìm kiếm',
                       icon: const Icon(Icons.clear),
                       onPressed: () {
                         setState(() => _search = '');
@@ -195,34 +180,33 @@ class _ProductListScreenState extends State<ProductListScreen> {
             },
           ),
           const SizedBox(height: 12),
-          DropdownButtonFormField<int?>(
-            decoration: const InputDecoration(
-              labelText: 'Lọc theo danh mục',
-              prefixIcon: Icon(Icons.category),
-              border: OutlineInputBorder(),
+          SizedBox(
+            height: 40,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: [
+                _categoryChip('Tất cả', null),
+                for (final c in _categories) _categoryChip(c.name, c.id),
+              ],
             ),
-            value: _categoryId,
-            items: [
-              const DropdownMenuItem<int?>(
-                value: null,
-                child: Text('Tất cả danh mục'),
-              ),
-            ]..addAll(
-                _categories.map(
-                  (c) => DropdownMenuItem<int?>(
-                    value: c.id,
-                    child: Text(c.name),
-                  ),
-                ),
-              ),
-            onChanged: _isLoading
-                ? null
-                : (v) async {
-                    setState(() => _categoryId = v);
-                    await _loadData();
-                  },
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _categoryChip(String label, int? id) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: _categoryId == id,
+        onSelected: _isLoading
+            ? null
+            : (_) async {
+                setState(() => _categoryId = id);
+                await _loadData();
+              },
       ),
     );
   }
@@ -230,113 +214,113 @@ class _ProductListScreenState extends State<ProductListScreen> {
   Widget _buildProductList() {
     final items = _paged!.items;
     if (items.isEmpty) {
-      return const Center(child: Text('Không có sản phẩm.'));
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: const [
+          EmptyState(
+            icon: Icons.inventory_2_outlined,
+            message: 'Không có sản phẩm.',
+          ),
+        ],
+      );
     }
-    return ListView.builder(
-      padding: const EdgeInsets.all(12),
+    return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
       itemCount: items.length,
-      itemBuilder: (context, index) {
-        final p = items[index];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: ListTile(
-            leading: p.fullPrimaryImageUrl.isNotEmpty
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      p.fullPrimaryImageUrl,
-                      width: 56,
-                      height: 56,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          const Icon(Icons.devices, size: 40),
-                    ),
-                  )
-                : const Icon(Icons.devices, size: 40),
-            title: Text(
-              p.name,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 4),
-                Text(
-                  '${p.categoryName} · ${p.brandName}',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (context, index) => _buildRow(items[index]),
+    );
+  }
+
+  Widget _buildRow(ProductListItem p) {
+    final scheme = Theme.of(context).colorScheme;
+    final muted = scheme.onSurfaceVariant;
+    final hasDiscount =
+        p.compareAtPrice != null && p.compareAtPrice! > p.price;
+
+    return Card(
+      child: InkWell(
+        onTap: () => _openForm(product: p),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
+          child: Row(
+            children: [
+              AdminThumb(
+                url: p.fullPrimaryImageUrl,
+                icon: Icons.devices_outlined,
+                size: 68,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${p.price.toStringAsFixed(0)} đ',
+                      p.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.indigo,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        height: 1.25,
                       ),
                     ),
-                    if (p.compareAtPrice != null &&
-                        p.compareAtPrice! > p.price) ...[
-                      const SizedBox(width: 8),
-                      Text(
-                        '${p.compareAtPrice!.toStringAsFixed(0)} đ',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurfaceVariant,
-                          decoration: TextDecoration.lineThrough,
+                    const SizedBox(height: 2),
+                    Text(
+                      '${p.categoryName} · ${p.brandName}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: muted, fontSize: 13),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 2,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text(
+                          formatVnd(p.price),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: scheme.primary,
+                          ),
                         ),
-                      ),
-                    ],
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: p.isActive
-                            ? Colors.green.shade100
-                            : Colors.grey.shade200,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        p.isActive ? 'Hoạt động' : 'Khóa',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: p.isActive
-                              ? Colors.green.shade800
-                              : Colors.grey.shade700,
-                          fontWeight: FontWeight.w600,
+                        if (hasDiscount)
+                          Text(
+                            formatVnd(p.compareAtPrice!),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: muted,
+                              decoration: TextDecoration.lineThrough,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        StatusPill(isActive: p.isActive),
+                        Text(
+                          formatDate(p.createdAt),
+                          style: TextStyle(color: muted, fontSize: 12),
                         ),
-                      ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  tooltip: 'Sửa',
-                  icon: const Icon(Icons.edit),
-                  onPressed: () => _openForm(product: p),
-                ),
-                IconButton(
-                  tooltip: 'Xóa',
-                  icon: const Icon(Icons.delete),
-                  color: Theme.of(context).colorScheme.error,
-                  onPressed: () => _deleteProduct(p.id, p.name),
-                ),
-              ],
-            ),
+              ),
+              RowMenu(
+                onEdit: () => _openForm(product: p),
+                onDelete: () => _deleteProduct(p.id, p.name),
+              ),
+            ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
@@ -344,42 +328,48 @@ class _ProductListScreenState extends State<ProductListScreen> {
     final paged = _paged;
     if (paged == null) return const SizedBox.shrink();
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
+        ),
+      ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            'Trang ${paged.pageIndex}/${paged.totalPages} '
-            '(${paged.totalCount} sản phẩm)',
-            style: TextStyle(
-              fontSize: 13,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+          Expanded(
+            child: Text(
+              'Trang ${paged.pageIndex}/${paged.totalPages} '
+              '(${paged.totalCount} sản phẩm)',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
-          Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.chevron_left),
-                tooltip: 'Trang trước',
-                onPressed: (_isLoading || !paged.hasPreviousPage)
-                    ? null
-                    : () {
-                        setState(() => _pageIndex--);
-                        _loadData(resetPage: false);
-                      },
-              ),
-              IconButton(
-                icon: const Icon(Icons.chevron_right),
-                tooltip: 'Trang sau',
-                onPressed: (_isLoading || !paged.hasNextPage)
-                    ? null
-                    : () {
-                        setState(() => _pageIndex++);
-                        _loadData(resetPage: false);
-                      },
-              ),
-            ],
+          IconButton(
+            icon: const Icon(Icons.chevron_left),
+            tooltip: 'Trang trước',
+            onPressed: (_isLoading || !paged.hasPreviousPage)
+                ? null
+                : () {
+                    setState(() => _pageIndex--);
+                    _loadData(resetPage: false);
+                  },
+          ),
+          IconButton(
+            icon: const Icon(Icons.chevron_right),
+            tooltip: 'Trang sau',
+            onPressed: (_isLoading || !paged.hasNextPage)
+                ? null
+                : () {
+                    setState(() => _pageIndex++);
+                    _loadData(resetPage: false);
+                  },
           ),
         ],
       ),

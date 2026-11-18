@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 import '../../models/brand_models.dart';
 import '../../services/brand_service.dart';
-import '../../widgets/error_banner.dart';
+import '../../widgets/admin_widgets.dart';
 import 'brand_form_screen.dart';
 
 class BrandListScreen extends StatefulWidget {
@@ -19,6 +19,8 @@ class _BrandListScreenState extends State<BrandListScreen> {
   List<BrandResponse> _brands = [];
   bool _isLoading = true;
   String? _errorMessage;
+  String _query = '';
+  bool? _status; // null = tất cả
 
   @override
   void initState() {
@@ -48,27 +50,12 @@ class _BrandListScreenState extends State<BrandListScreen> {
   }
 
   Future<void> _deleteBrand(int id, String name) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Xác nhận xóa'),
-        content: Text('Bạn có chắc chắn muốn xóa thương hiệu "$name"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Hủy'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: const Text('Xóa'),
-          ),
-        ],
-      ),
+    final confirmed = await confirmDelete(
+      context,
+      entity: 'thương hiệu',
+      name: name,
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
 
     setState(() => _isLoading = true);
     try {
@@ -103,136 +90,147 @@ class _BrandListScreenState extends State<BrandListScreen> {
     _loadBrands();
   }
 
+  List<BrandResponse> get _filtered {
+    final q = _query.trim().toLowerCase();
+    return _brands.where((b) {
+      if (_status != null && b.isActive != _status) return false;
+      return q.isEmpty || b.name.toLowerCase().contains(q);
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final items = _filtered;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Quản lý Thương hiệu'),
-        automaticallyImplyLeading: false,
-      ),
-      body: RefreshIndicator(
-        onRefresh: _loadBrands,
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _errorMessage != null && _brands.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        ErrorBanner(message: _errorMessage!),
-                        const SizedBox(height: 16),
-                        FilledButton(
-                          onPressed: _loadBrands,
-                          child: const Text('Thử lại'),
-                        ),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(12),
-                    itemCount: _brands.length,
-                    itemBuilder: (context, index) {
-                      final b = _brands[index];
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        child: ListTile(
-                          leading: b.fullLogoUrl.isNotEmpty
-                              ? ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(
-                                    b.fullLogoUrl,
-                                    width: 56,
-                                    height: 56,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) =>
-                                        const Icon(Icons.business, size: 40),
-                                  ),
-                                )
-                              : const Icon(Icons.business, size: 40),
-                          title: Text(
-                            b.name,
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: 4),
-                              if (b.description != null &&
-                                  b.description!.isNotEmpty)
-                                Text(
-                                  b.description!,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
-                                  ),
-                                ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: b.isActive
-                                          ? Colors.green.shade100
-                                          : Colors.grey.shade200,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      b.isActive ? 'Hoạt động' : 'Khóa',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: b.isActive
-                                            ? Colors.green.shade800
-                                            : Colors.grey.shade700,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    '${b.productCount} sản phẩm',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                tooltip: 'Sửa',
-                                icon: const Icon(Icons.edit),
-                                onPressed: () => _openForm(brand: b),
-                              ),
-                              IconButton(
-                                tooltip: 'Xóa',
-                                icon: const Icon(Icons.delete),
-                                color: Theme.of(context).colorScheme.error,
-                                onPressed: () => _deleteBrand(b.id, b.name),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
+      appBar: AppBar(title: const Text('Thương hiệu')),
+      body: Column(
+        children: [
+          StatusFilterBar(
+            hint: 'Tìm thương hiệu',
+            status: _status,
+            onQueryChanged: (v) => setState(() => _query = v),
+            onStatusChanged: (v) => setState(() => _status = v),
+          ),
+          if (!_isLoading && _errorMessage == null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '${items.length} thương hiệu',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
+                ),
+              ),
+            ),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _loadBrands,
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _errorMessage != null && _brands.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [
+                            ErrorRetry(
+                              message: _errorMessage!,
+                              onRetry: _loadBrands,
+                            ),
+                          ],
+                        )
+                      : items.isEmpty
+                          ? ListView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              children: const [
+                                EmptyState(
+                                  icon: Icons.storefront_outlined,
+                                  message: 'Không có thương hiệu phù hợp.',
+                                ),
+                              ],
+                            )
+                          : ListView.separated(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding:
+                                  const EdgeInsets.fromLTRB(16, 4, 16, 96),
+                              itemCount: items.length,
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(height: 10),
+                              itemBuilder: (context, i) =>
+                                  _buildRow(items[i]),
+                            ),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        // heroTag riêng: các tab nằm cùng IndexedStack nên tag mặc định sẽ bị trùng.
+        heroTag: 'fab_brand',
         onPressed: () => _openForm(),
         icon: const Icon(Icons.add),
         label: const Text('Thêm thương hiệu'),
+      ),
+    );
+  }
+
+  Widget _buildRow(BrandResponse b) {
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Card(
+      child: InkWell(
+        onTap: () => _openForm(brand: b),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
+          child: Row(
+            children: [
+              AdminThumb(url: b.fullLogoUrl, icon: Icons.storefront_outlined),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      b.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
+                    ),
+                    if (b.description != null && b.description!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          b.description!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: muted, fontSize: 13),
+                        ),
+                      ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        StatusPill(isActive: b.isActive),
+                        Text(
+                          '${b.productCount} sản phẩm',
+                          style: TextStyle(color: muted, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              RowMenu(
+                onEdit: () => _openForm(brand: b),
+                onDelete: () => _deleteBrand(b.id, b.name),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

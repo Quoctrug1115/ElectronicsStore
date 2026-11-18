@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'core/app_theme.dart';
 import 'core/token_storage.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/admin_home.dart';
@@ -17,10 +18,7 @@ class ElectronicsStoreApp extends StatelessWidget {
     return MaterialApp(
       title: 'Electronics Store',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
-      ),
+      theme: AppTheme.light,
       home: const AuthGate(),
     );
   }

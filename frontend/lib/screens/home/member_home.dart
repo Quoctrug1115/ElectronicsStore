@@ -1,104 +1,84 @@
 import 'package:flutter/material.dart';
 
-import '../auth/login_screen.dart';
+import '../../widgets/account_tab.dart';
 import '../member/member_product_list_screen.dart';
 
-class MemberHome extends StatelessWidget {
+class MemberHome extends StatefulWidget {
   const MemberHome({super.key});
+
+  @override
+  State<MemberHome> createState() => _MemberHomeState();
+}
+
+class _MemberHomeState extends State<MemberHome> {
+  int _index = 0;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Trang Thành viên'),
-        actions: [
-          IconButton(
-            tooltip: 'Đăng xuất',
-            icon: const Icon(Icons.logout),
-            onPressed: () => Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (_) => const LoginScreen()),
-              (_) => false,
-            ),
+      body: IndexedStack(
+        index: _index,
+        children: const [
+          MemberProductListScreen(),
+          _CartPlaceholder(),
+          AccountTab(isAdmin: false),
+        ],
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _index,
+        onDestinationSelected: (i) => setState(() => _index = i),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.storefront_outlined),
+            selectedIcon: Icon(Icons.storefront),
+            label: 'Sản phẩm',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.shopping_cart_outlined),
+            selectedIcon: Icon(Icons.shopping_cart),
+            label: 'Giỏ hàng',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Tài khoản',
           ),
         ],
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.person, size: 80, color: Colors.indigo),
-            const SizedBox(height: 16),
-            Text('Chào Thành viên',
-                style: Theme.of(context).textTheme.headlineMedium),
-            const SizedBox(height: 8),
-            const Text('Bạn có thể duyệt và mua sản phẩm.'),
-            const SizedBox(height: 40),
-            _memberCard(
-              context,
-              icon: Icons.inventory,
-              label: 'Danh sách Sản phẩm',
-              subtitle: 'Xem và tìm kiếm sản phẩm',
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const MemberProductListScreen(),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            _memberCard(
-              context,
-              icon: Icons.person_outline,
-              label: 'Thông tin tài khoản',
-              subtitle: 'Quản lý hồ sơ cá nhân',
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Chức năng đang phát triển.')),
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-            _memberCard(
-              context,
-              icon: Icons.shopping_cart_outlined,
-              label: 'Giỏ hàng',
-              subtitle: 'Quản lý sản phẩm đã chọn',
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Chức năng đang phát triển.')),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
     );
   }
+}
 
-  Widget _memberCard(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 420),
-      child: Card(
-        child: ListTile(
-          leading: CircleAvatar(
-            backgroundColor: Colors.indigo.shade100,
-            child: Icon(icon, color: Colors.indigo),
+class _CartPlaceholder extends StatelessWidget {
+  const _CartPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Scaffold(
+      appBar: AppBar(title: const Text('Giỏ hàng')),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.shopping_cart_outlined,
+                size: 72,
+                color: theme.colorScheme.outline,
+              ),
+              const SizedBox(height: 16),
+              Text('Giỏ hàng đang trống', style: theme.textTheme.titleMedium),
+              const SizedBox(height: 8),
+              Text(
+                'Chức năng đang phát triển.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
           ),
-          title: Text(label),
-          subtitle: Text(
-            subtitle,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              fontSize: 12,
-            ),
-          ),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: onTap,
         ),
       ),
     );

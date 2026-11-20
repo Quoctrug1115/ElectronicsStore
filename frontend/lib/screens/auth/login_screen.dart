@@ -63,7 +63,7 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       } else {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const MemberHome()),
+          MaterialPageRoute(builder: (_) => MemberHome()),
         );
       }
     } on ApiException catch (e) {

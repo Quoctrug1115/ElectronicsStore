@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/app_theme.dart';
 import 'core/token_storage.dart';
@@ -7,7 +8,7 @@ import 'screens/home/admin_home.dart';
 import 'screens/home/member_home.dart';
 
 void main() {
-  runApp(const ElectronicsStoreApp());
+  runApp(const ProviderScope(child: ElectronicsStoreApp()));
 }
 
 class ElectronicsStoreApp extends StatelessWidget {
@@ -64,7 +65,7 @@ class _AuthGateState extends State<AuthGate> {
       case '/admin':
         return const AdminHome();
       case '/member':
-        return const MemberHome();
+        return MemberHome();
       default:
         return const LoginScreen();
     }

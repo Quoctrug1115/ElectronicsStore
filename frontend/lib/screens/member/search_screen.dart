@@ -11,7 +11,7 @@ import '../../widgets/error_banner.dart';
 import '../member/product_detail_screen.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
-  const SearchScreen({super.key});
+  SearchScreen({super.key});
 
   @override
   ConsumerState<SearchScreen> createState() => _SearchScreenState();

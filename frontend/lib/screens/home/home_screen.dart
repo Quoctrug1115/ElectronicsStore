@@ -11,9 +11,11 @@ import '../../services/category_service.dart';
 import '../../services/product_service.dart';
 import '../../widgets/error_banner.dart';
 import '../member/product_detail_screen.dart';
+import '../member/category_products_screen.dart';
+import '../member/search_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
-  const HomeScreen({super.key});
+  HomeScreen({super.key});
 
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
@@ -139,7 +141,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const SearchScreen()),
+                MaterialPageRoute(builder: (_) => SearchScreen()),
               );
             },
             tooltip: 'Tìm kiếm',
@@ -164,7 +166,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const MemberProductListScreen(initialSortBy: 'newest'),
+                      builder: (_) => MemberProductListScreen(initialSortBy: 'newest'),
                     ),
                   );
                 }),
@@ -260,7 +262,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
     }
 
-    final allCategories = [
+    final allCategories = <CategoryResponse>[
       CategoryResponse(
         id: 0,
         name: 'Tất cả',
@@ -285,7 +287,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const MemberProductListScreen(),
+                    builder: (_) => MemberProductListScreen(),
                   ),
                 );
               } else {

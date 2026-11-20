@@ -6,8 +6,8 @@ import '../../widgets/account_tab.dart';
 import '../member/cart_screen.dart';
 import '../home/home_screen.dart';
 
-class MemberHome extends ConsumerState<MemberHome> {
-  const MemberHome({super.key});
+class MemberHome extends ConsumerStatefulWidget {
+  MemberHome({super.key});
 
   @override
   ConsumerState<MemberHome> createState() => _MemberHomeState();

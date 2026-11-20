@@ -14,7 +14,7 @@ import '../member/product_detail_screen.dart';
 class CategoryProductsScreen extends ConsumerStatefulWidget {
   final CategoryResponse category;
 
-  const CategoryProductsScreen({super.key, required this.category});
+  CategoryProductsScreen({super.key, required this.category});
 
   @override
   ConsumerState<CategoryProductsScreen> createState() => _CategoryProductsScreenState();

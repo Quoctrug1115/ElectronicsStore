@@ -15,7 +15,7 @@ import 'product_detail_screen.dart';
 class MemberProductListScreen extends ConsumerStatefulWidget {
   final String? initialSortBy;
 
-  const MemberProductListScreen({super.key, this.initialSortBy});
+  MemberProductListScreen({super.key, this.initialSortBy});
 
   @override
   ConsumerState<MemberProductListScreen> createState() =>

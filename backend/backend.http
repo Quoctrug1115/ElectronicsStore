@@ -175,3 +175,43 @@ Content-Type: image/jpeg
 ### 14. Xóa sản phẩm (Kiểm tra wwwroot/images/products sẽ sạch bóng file test2.jpg)
 DELETE {{baseUrl}}/api/products/{{createProduct.response.body.productId}}
 Authorization: Bearer {{loginAdmin.response.body.accessToken}}
+
+### 15. Lấy danh sách danh mục đang hoạt động (cho thanh lọc khách hàng)
+GET {{baseUrl}}/api/categories?isActive=true
+
+### 16. Lấy danh sách sản phẩm mới nhất có phân trang (OrderByDescending CreatedAt)
+GET {{baseUrl}}/api/products/newest?page=1&pageSize=6
+
+### 17. Lọc sản phẩm theo danh mục + tìm kiếm từ khóa + phân trang
+GET {{baseUrl}}/api/products?categoryId=1&search=iphone&page=1&pageSize=10
+
+### 18. Lấy chi tiết sản phẩm theo ID (kèm biến thể, ảnh, thông số & SP liên quan)
+GET {{baseUrl}}/api/products/1
+
+### 19. Thêm sản phẩm vào giỏ hàng (Thay variantId bằng ID thực tế trong bảng ProductVariants)
+# @name addToCart
+POST {{baseUrl}}/api/cart/items
+Content-Type: application/json
+Authorization: Bearer {{loginMember.response.body.accessToken}}
+
+{
+  "variantId": 1,
+  "quantity": 2
+}
+
+### 20. Lấy giỏ hàng theo UserId
+GET {{baseUrl}}/api/cart/{{loginMember.response.body.user.id}}
+Authorization: Bearer {{loginMember.response.body.accessToken}}
+
+### 21. Cập nhật số lượng item trong giỏ
+PUT {{baseUrl}}/api/cart/items/{{addToCart.response.body.data.items[0].id}}
+Content-Type: application/json
+Authorization: Bearer {{loginMember.response.body.accessToken}}
+
+{
+  "quantity": 5
+}
+
+### 22. Xóa 1 item khỏi giỏ hàng
+DELETE {{baseUrl}}/api/cart/items/{{addToCart.response.body.data.items[0].id}}
+Authorization: Bearer {{loginMember.response.body.accessToken}}

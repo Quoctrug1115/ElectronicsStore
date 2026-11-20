@@ -3,10 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/cart_provider.dart';
 import '../../widgets/account_tab.dart';
-import '../member/member_product_list_screen.dart';
 import '../member/cart_screen.dart';
+import '../home/home_screen.dart';
 
-class MemberHome extends ConsumerState StatefulWidget {
+class MemberHome extends ConsumerState<MemberHome> {
   const MemberHome({super.key});
 
   @override
@@ -24,7 +24,7 @@ class _MemberHomeState extends ConsumerState<MemberHome> {
       body: IndexedStack(
         index: _index,
         children: const [
-          MemberProductListScreen(),
+          HomeScreen(),
           CartScreen(),
           AccountTab(isAdmin: false),
         ],

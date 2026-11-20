@@ -14,4 +14,5 @@ class ApiConfig {
   static const String categories = '/api/categories';
   static const String brands = '/api/brands';
   static const String products = '/api/products';
+  static const String orders = '/api/orders';
 }

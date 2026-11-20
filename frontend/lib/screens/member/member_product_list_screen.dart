@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/screens/member/cart_screen.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -161,7 +162,7 @@ class _MemberProductListScreenState extends ConsumerState<MemberProductListScree
               child: const Icon(Icons.shopping_cart_outlined),
             ),
             onPressed: () {
-              DefaultTabController.of(context)?.animateTo(1);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const CartScreen()));
             },
             tooltip: 'Giỏ hàng',
           ),

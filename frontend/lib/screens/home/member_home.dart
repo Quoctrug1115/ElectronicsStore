@@ -7,7 +7,7 @@ import '../member/cart_screen.dart';
 import '../home/home_screen.dart';
 
 class MemberHome extends ConsumerStatefulWidget {
-  MemberHome({super.key});
+  const MemberHome({super.key});
 
   @override
   ConsumerState<MemberHome> createState() => _MemberHomeState();
@@ -24,8 +24,12 @@ class _MemberHomeState extends ConsumerState<MemberHome> {
       body: IndexedStack(
         index: _index,
         children: [
-          HomeScreen(),
-          CartScreen(),
+          HomeScreen(
+            onOpenCart: () => setState(() => _index = 1),
+          ),
+          CartScreen(
+            onContinueShopping: () => setState(() => _index = 0),
+          ),
           AccountTab(isAdmin: false),
         ],
       ),

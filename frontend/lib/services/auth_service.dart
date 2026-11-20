@@ -46,6 +46,11 @@ class AuthService {
     return 'Đổi mật khẩu thành công.';
   }
 
+  Future<String?> getToken() async {
+    // This will be implemented using TokenStorage
+    return null; // Placeholder - actual implementation in TokenStorage
+  }
+
   Future<dynamic> _post(
     String path,
     Map<String, dynamic> body, {

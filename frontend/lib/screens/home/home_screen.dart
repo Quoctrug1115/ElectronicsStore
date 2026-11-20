@@ -16,8 +16,9 @@ import '../member/search_screen.dart';
 import '../member/member_product_list_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
-  HomeScreen({super.key});
+  final VoidCallback? onOpenCart;
 
+  const HomeScreen({super.key, this.onOpenCart});
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
@@ -31,7 +32,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   String? _categoriesError;
 
   final List<ProductListItem> _latestProducts = [];
-  bool _isLoadingLatest = true;
+  bool _isLoadingLatest = false;
   bool _hasMoreLatest = true;
   int _latestPage = 1;
   final int _pageSize = 10;
@@ -77,7 +78,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _loadLatestProducts({bool reset = false}) async {
-    if (_isLoadingLatest || (!_hasMoreLatest && !reset)) return;
+    if (_isLoadingLatest && !reset) return;
+    if (!_hasMoreLatest && !reset) return;
 
     if (reset) {
       _latestPage = 1;
@@ -133,7 +135,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           IconButton(
             icon: _buildCartBadge(cartQuantity),
             onPressed: () {
-              DefaultTabController.of(context)?.animateTo(1);
+              widget.onOpenCart?.call();
             },
             tooltip: 'Giỏ hàng',
           ),
@@ -350,13 +352,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildProductCard(ProductListItem p) {
+Widget _buildProductCard(ProductListItem p) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final hasDiscount = p.compareAtPrice != null && p.compareAtPrice! > p.price;
     final isOutOfStock = !p.isActive;
 
     return Card(
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () {
           Navigator.push(
@@ -370,28 +373,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AspectRatio(
-              aspectRatio: 1.15,
+            SizedBox(
+              height: 150,
+              width: double.infinity,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  ClipRRect(
-                    borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(12)),
-                    child: ColoredBox(
-                      color: scheme.surfaceContainerHighest,
-                      child: p.fullPrimaryImageUrl.isNotEmpty
-                          ? Image.network(
-                              p.fullPrimaryImageUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) => Icon(
-                                Icons.devices,
-                                size: 40,
-                                color: scheme.outline,
-                              ),
-                            )
-                          : Icon(Icons.devices, size: 40, color: scheme.outline),
-                    ),
+                  ColoredBox(
+                    color: scheme.surfaceContainerHighest,
+                    child: p.fullPrimaryImageUrl.isNotEmpty
+                        ? Image.network(
+                            p.fullPrimaryImageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Icon(
+                              Icons.devices,
+                              size: 40,
+                              color: scheme.outline,
+                            ),
+                          )
+                        : Icon(Icons.devices, size: 40, color: scheme.outline),
                   ),
                   if (isOutOfStock)
                     Positioned(
@@ -428,14 +428,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         onTap: isOutOfStock
                             ? null
                             : () {
-                                ref.read(cartProvider.notifier).addItem(
-                                  CartItem(product: p, quantity: 1),
-                                );
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Đã thêm "${p.name}" vào giỏ hàng'),
-                                    duration: const Duration(seconds: 1),
-                                    behavior: SnackBarBehavior.floating,
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        ProductDetailScreen(productId: p.id),
                                   ),
                                 );
                               },
@@ -447,7 +444,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                Icons.add_shopping_cart,
+                                Icons.visibility_outlined,
                                 size: 16,
                                 color: isOutOfStock
                                     ? scheme.surface
@@ -455,7 +452,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                'Thêm',
+                                'Chọn mua',
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
@@ -473,51 +470,53 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    p.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      height: 1.25,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${p.categoryName} · ${p.brandName}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    formatVnd(p.price),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 15,
-                      color: scheme.primary,
-                    ),
-                  ),
-                  if (hasDiscount)
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      formatVnd(p.compareAtPrice!),
+                      p.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        height: 1.25,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${p.categoryName} · ${p.brandName}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: scheme.onSurfaceVariant,
-                        decoration: TextDecoration.lineThrough,
                       ),
                     ),
-                ],
+                    const Spacer(),
+                    Text(
+                      formatVnd(p.price),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                        color: scheme.primary,
+                      ),
+                    ),
+                    if (hasDiscount)
+                      Text(
+                        formatVnd(p.compareAtPrice!),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          decoration: TextDecoration.lineThrough,
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ],

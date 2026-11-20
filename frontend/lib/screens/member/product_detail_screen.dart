@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/screens/member/cart_screen.dart';
 
 import '../../core/format.dart';
 import '../../models/cart_models.dart';
@@ -539,7 +540,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
         action: SnackBarAction(
           label: 'Xem giỏ',
           onPressed: () {
-            DefaultTabController.of(context)?.animateTo(1);
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const CartScreen()));
           },
         ),
       ),

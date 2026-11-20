@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/screens/member/cart_screen.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/format.dart';
@@ -127,7 +128,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               child: const Icon(Icons.shopping_cart_outlined),
             ),
             onPressed: () {
-              DefaultTabController.of(context)?.animateTo(1);
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const CartScreen()));
             },
             tooltip: 'Giỏ hàng',
           ),

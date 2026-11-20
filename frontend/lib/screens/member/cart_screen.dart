@@ -7,7 +7,9 @@ import '../../providers/cart_provider.dart';
 import '../member/checkout_screen.dart';
 
 class CartScreen extends ConsumerWidget {
-  const CartScreen({super.key});
+  final VoidCallback? onContinueShopping;
+
+  const CartScreen({super.key, this.onContinueShopping});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -60,9 +62,13 @@ class CartScreen extends ConsumerWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
-            FilledButton.icon(
+              FilledButton.icon(
               onPressed: () {
-                DefaultTabController.of(context)?.animateTo(0);
+                if (Navigator.canPop(context)) {
+                  Navigator.pop(context);
+                } else {
+                  onContinueShopping?.call();
+                }
               },
               icon: const Icon(Icons.storefront),
               label: const Text('Tiếp tục mua sắm'),

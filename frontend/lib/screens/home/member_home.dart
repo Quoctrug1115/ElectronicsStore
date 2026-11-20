@@ -1,44 +1,49 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../providers/cart_provider.dart';
 import '../../widgets/account_tab.dart';
 import '../member/member_product_list_screen.dart';
+import '../member/cart_screen.dart';
 
-class MemberHome extends StatefulWidget {
+class MemberHome extends ConsumerState StatefulWidget {
   const MemberHome({super.key});
 
   @override
-  State<MemberHome> createState() => _MemberHomeState();
+  ConsumerState<MemberHome> createState() => _MemberHomeState();
 }
 
-class _MemberHomeState extends State<MemberHome> {
+class _MemberHomeState extends ConsumerState<MemberHome> {
   int _index = 0;
 
   @override
   Widget build(BuildContext context) {
+    final cartQuantity = ref.watch(cartTotalQuantityProvider);
+
     return Scaffold(
       body: IndexedStack(
         index: _index,
         children: const [
           MemberProductListScreen(),
-          _CartPlaceholder(),
+          CartScreen(),
           AccountTab(isAdmin: false),
         ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: const [
-          NavigationDestination(
+        destinations: [
+          const NavigationDestination(
             icon: Icon(Icons.storefront_outlined),
             selectedIcon: Icon(Icons.storefront),
             label: 'Sản phẩm',
           ),
           NavigationDestination(
-            icon: Icon(Icons.shopping_cart_outlined),
-            selectedIcon: Icon(Icons.shopping_cart),
+            icon: _buildCartBadge(cartQuantity, false),
+            selectedIcon: _buildCartBadge(cartQuantity, true),
             label: 'Giỏ hàng',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.person_outline),
             selectedIcon: Icon(Icons.person),
             label: 'Tài khoản',
@@ -47,40 +52,12 @@ class _MemberHomeState extends State<MemberHome> {
       ),
     );
   }
-}
 
-class _CartPlaceholder extends StatelessWidget {
-  const _CartPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Giỏ hàng')),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.shopping_cart_outlined,
-                size: 72,
-                color: theme.colorScheme.outline,
-              ),
-              const SizedBox(height: 16),
-              Text('Giỏ hàng đang trống', style: theme.textTheme.titleMedium),
-              const SizedBox(height: 8),
-              Text(
-                'Chức năng đang phát triển.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+  Widget _buildCartBadge(int quantity, bool selected) {
+    return Badge(
+      isLabelVisible: quantity > 0,
+      label: quantity > 99 ? const Text('99+') : Text('$quantity'),
+      child: Icon(selected ? Icons.shopping_cart : Icons.shopping_cart_outlined),
     );
   }
 }

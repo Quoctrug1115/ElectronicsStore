@@ -1,7 +1,18 @@
 -- Active: 1795024864454@@127.0.0.1@1433@ElectronicsStore
 
-IF DB_ID('ElectronicsStore') IS NULL
-    CREATE DATABASE ElectronicsStore;
+USE master;
+GO
+
+-- Xóa database cũ nếu tồn tại để làm sạch toàn bộ dữ liệu lỗi font trước đó
+IF DB_ID('ElectronicsStore') IS NOT NULL
+BEGIN
+    ALTER DATABASE ElectronicsStore SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+    DROP DATABASE ElectronicsStore;
+END
+GO
+
+CREATE DATABASE ElectronicsStore;
+GO
 
 USE ElectronicsStore;
 GO
@@ -24,6 +35,8 @@ CREATE TABLE Users (
     UpdatedAt DATETIME2
 );
 GO
+
+
 
 -- Email unique chỉ với user chưa bị xóa mềm (cho phép đăng ký lại)
 CREATE UNIQUE INDEX UX_Users_Email
@@ -603,27 +616,9 @@ INSERT INTO Warehouses (Name, Address)
 VALUES (N'Kho chính', N'TP. Hồ Chí Minh');
 GO
 
--- Lưu ý: tài khoản Admin đầu tiên nên được tạo bằng code (seed trong C#)
--- để mật khẩu được hash đúng thuật toán (BCrypt / ASP.NET Identity hasher).
-
--- =============================================
--- END OF SCRIPT
--- =============================================
-
-select * from Users
-
-USE ElectronicsStore;
+-- Kiểm tra lại dữ liệu tiếng Việt sau khi khởi tạo
+SELECT * FROM Categories;
+SELECT * FROM Brands;
+SELECT * FROM Roles;
 GO
 
-IF COL_LENGTH('Brands', 'CreatedAt') IS NULL
-    ALTER TABLE Brands ADD CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME();
-
-IF COL_LENGTH('Categories', 'CreatedAt') IS NULL
-    ALTER TABLE Categories ADD CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME();
-
-IF COL_LENGTH('Products', 'CreatedAt') IS NULL
-    ALTER TABLE Products ADD CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME();
-
-IF COL_LENGTH('ProductVariants', 'CreatedAt') IS NULL
-    ALTER TABLE ProductVariants ADD CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME();
-GO

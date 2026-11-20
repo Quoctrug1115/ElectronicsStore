@@ -17,7 +17,8 @@ public class ElectronicsStoreContext : DbContext
     public DbSet<ProductVariant> ProductVariants => Set<ProductVariant>();
     public DbSet<ProductImage> ProductImages => Set<ProductImage>();
     public DbSet<ProductSpecification> ProductSpecifications => Set<ProductSpecification>();
-
+    public DbSet<Cart> Carts => Set<Cart>();
+    public DbSet<CartItem> CartItems => Set<CartItem>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -100,6 +101,30 @@ public class ElectronicsStoreContext : DbContext
             entity.HasOne(s => s.Product)
                   .WithMany(p => p.Specifications)
                   .HasForeignKey(s => s.ProductId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<Cart>(entity =>
+        {
+            entity.HasIndex(c => c.UserId).IsUnique();
+
+            entity.HasOne(c => c.User)
+                  .WithOne()
+                  .HasForeignKey<Cart>(c => c.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CartItem>(entity =>
+        {
+            entity.HasIndex(ci => new { ci.CartId, ci.VariantId }).IsUnique();
+
+            entity.HasOne(ci => ci.Cart)
+                  .WithMany(c => c.Items)
+                  .HasForeignKey(ci => ci.CartId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(ci => ci.Variant)
+                  .WithMany()
+                  .HasForeignKey(ci => ci.VariantId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
     }

@@ -1,4 +1,4 @@
--- Active: 1794569562511@@127.0.0.1@1433@ElectronicsStore
+-- Active: 1795024864454@@127.0.0.1@1433@ElectronicsStore
 
 IF DB_ID('ElectronicsStore') IS NULL
     CREATE DATABASE ElectronicsStore;
@@ -611,3 +611,19 @@ GO
 -- =============================================
 
 select * from Users
+
+USE ElectronicsStore;
+GO
+
+IF COL_LENGTH('Brands', 'CreatedAt') IS NULL
+    ALTER TABLE Brands ADD CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME();
+
+IF COL_LENGTH('Categories', 'CreatedAt') IS NULL
+    ALTER TABLE Categories ADD CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME();
+
+IF COL_LENGTH('Products', 'CreatedAt') IS NULL
+    ALTER TABLE Products ADD CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME();
+
+IF COL_LENGTH('ProductVariants', 'CreatedAt') IS NULL
+    ALTER TABLE ProductVariants ADD CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME();
+GO

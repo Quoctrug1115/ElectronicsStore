@@ -20,11 +20,12 @@ public class CategoriesController : ControllerBase
         _env = env;
     }
 
-    // 1. LẤY DANH SÁCH DANH MỤC
+    // 1. LẤY DANH SÁCH DANH MỤC (Hỗ trợ lọc isActive & search)
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] bool? isActive)
+    public async Task<IActionResult> GetAll([FromQuery] bool? isActive, [FromQuery] string? search = null)
     {
         var query = _context.Categories
+            .AsNoTracking()
             .Include(c => c.Parent)
             .AsQueryable();
 
@@ -33,8 +34,14 @@ public class CategoriesController : ControllerBase
             query = query.Where(c => c.IsActive == isActive.Value);
         }
 
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var pattern = $"%{search.Trim()}%";
+            query = query.Where(c => EF.Functions.Like(c.Name, pattern));
+        }
+
         var categories = await query
-            .OrderByDescending(c => c.CreatedAt)
+            .OrderBy(c => c.Id)
             .Select(c => new CategoryResponseDto
             {
                 Id = c.Id,
@@ -45,18 +52,23 @@ public class CategoriesController : ControllerBase
                 ImageUrl = c.ImageUrl,
                 IsActive = c.IsActive,
                 CreatedAt = c.CreatedAt,
-                ProductCount = c.Products.Count(p => !p.IsDeleted)
+                ProductCount = c.Products.Count(p => !p.IsDeleted && p.IsActive)
             })
             .ToListAsync();
 
         return Ok(categories);
     }
 
+    // 1b. LẤY DANH SÁCH DANH MỤC ĐANG HOẠT ĐỘNG
+    [HttpGet("active")]
+    public Task<IActionResult> GetActiveCategories() => GetAll(isActive: true);
+
     // 2. LẤY CHI TIẾT DANH MỤC THEO ID
     [HttpGet("{id:long}")]
     public async Task<IActionResult> GetById(long id)
     {
         var category = await _context.Categories
+            .AsNoTracking()
             .Include(c => c.Parent)
             .Where(c => c.Id == id)
             .Select(c => new CategoryResponseDto
@@ -69,7 +81,7 @@ public class CategoriesController : ControllerBase
                 ImageUrl = c.ImageUrl,
                 IsActive = c.IsActive,
                 CreatedAt = c.CreatedAt,
-                ProductCount = c.Products.Count(p => !p.IsDeleted)
+                ProductCount = c.Products.Count(p => !p.IsDeleted && p.IsActive)
             })
             .FirstOrDefaultAsync();
 
@@ -207,7 +219,6 @@ public class CategoriesController : ControllerBase
         if (category == null)
             return NotFound(new { message = "Không tìm thấy danh mục." });
 
-        // BẮT BUỘC: Chặn xóa nếu đã có sản phẩm thuộc danh mục này
         bool hasProducts = await _context.Products.AnyAsync(p => p.CategoryId == id);
         if (hasProducts)
         {

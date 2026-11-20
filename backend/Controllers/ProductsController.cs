@@ -21,17 +21,58 @@ public class ProductsController : ControllerBase
         _fileStorage = fileStorage;
     }
 
-    // 1. LẤY DANH SÁCH SẢN PHẨM CÓ PHÂN TRANG, LỌC & TÌM KIẾM
+    // 1. LẤY SẢN PHẨM MỚI NHẤT CÓ PHÂN TRANG (OrderByDescending(p => p.CreatedAt))
+    // Hỗ trợ cả ?page=1 lẫn ?pageIndex=1
+    [HttpGet("newest")]
+    public async Task<IActionResult> GetNewest(
+        [FromQuery] int? page = null,
+        [FromQuery] int pageIndex = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] long? categoryId = null)
+    {
+        int currentPage = page ?? pageIndex;
+
+        var query = _context.Products
+            .AsNoTracking()
+            .Include(p => p.Category)
+            .Include(p => p.Brand)
+            .Include(p => p.Variants)
+            .Include(p => p.Images)
+            .Where(p => !p.IsDeleted && p.IsActive)
+            .AsQueryable();
+
+        if (categoryId.HasValue)
+        {
+            query = query.Where(p =>
+                p.CategoryId == categoryId.Value ||
+                p.Category.ParentId == categoryId.Value);
+        }
+
+        query = query.OrderByDescending(p => p.CreatedAt);
+
+        var pagedEntities = await PagedResult<Product>.CreateAsync(query, currentPage, pageSize);
+        return Ok(MapToPagedProductList(pagedEntities));
+    }
+
+    // 2. LẤY DANH SÁCH SẢN PHẨM: LỌC DANH MỤC, TÌM KIẾM, PHÂN TRANG
+    // Hỗ trợ query params: ?categoryId=...&search=...&page=... (và pageIndex, pageSize, brandId, minPrice, maxPrice, sortBy)
     [HttpGet]
     public async Task<IActionResult> GetPaged(
+        [FromQuery] int? page = null,
         [FromQuery] int pageIndex = 1,
         [FromQuery] int pageSize = 10,
         [FromQuery] string? search = null,
         [FromQuery] long? categoryId = null,
         [FromQuery] long? brandId = null,
+        [FromQuery] decimal? minPrice = null,
+        [FromQuery] decimal? maxPrice = null,
+        [FromQuery] bool? isActive = null,
         [FromQuery] string? sortBy = "newest")
     {
+        int currentPage = page ?? pageIndex;
+
         var query = _context.Products
+            .AsNoTracking()
             .Include(p => p.Category)
             .Include(p => p.Brand)
             .Include(p => p.Variants)
@@ -39,71 +80,93 @@ public class ProductsController : ControllerBase
             .Where(p => !p.IsDeleted)
             .AsQueryable();
 
-        if (!string.IsNullOrWhiteSpace(search))
+        if (isActive.HasValue)
         {
-            var keyword = search.Trim();
-            query = query.Where(p => EF.Functions.Like(p.Name, $"%{keyword}%"));
+            query = query.Where(p => p.IsActive == isActive.Value);
         }
 
+        // Lọc theo danh mục (bao gồm cả danh mục con nếu chọn danh mục cha)
         if (categoryId.HasValue)
-            query = query.Where(p => p.CategoryId == categoryId.Value);
+        {
+            query = query.Where(p =>
+                p.CategoryId == categoryId.Value ||
+                p.Category.ParentId == categoryId.Value);
+        }
 
         if (brandId.HasValue)
+        {
             query = query.Where(p => p.BrandId == brandId.Value);
+        }
 
-        // Sắp xếp (Ép sang double? để tương thích hoàn toàn với SQLite khi sort theo decimal)
+        // Tìm kiếm theo Tên sản phẩm, Mô tả, Thương hiệu, Danh mục hoặc Mã SKU
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var pattern = $"%{search.Trim()}%";
+            query = query.Where(p =>
+                EF.Functions.Like(p.Name, pattern) ||
+                (p.Description != null && EF.Functions.Like(p.Description, pattern)) ||
+                EF.Functions.Like(p.Brand.Name, pattern) ||
+                EF.Functions.Like(p.Category.Name, pattern) ||
+                p.Variants.Any(v => EF.Functions.Like(v.SKU, pattern))
+            );
+        }
+
+        // Lọc theo khoảng giá (ép double để tương thích cả SQL Server và SQLite)
+        if (minPrice.HasValue)
+        {
+            var min = (double)minPrice.Value;
+            query = query.Where(p => p.Variants.Any(v => v.IsActive && (double)v.Price >= min));
+        }
+
+        if (maxPrice.HasValue)
+        {
+            var max = (double)maxPrice.Value;
+            query = query.Where(p => p.Variants.Any(v => v.IsActive && (double)v.Price <= max));
+        }
+
+        // Sắp xếp
         query = sortBy switch
         {
             "price_asc" => query.OrderBy(p => p.Variants.Where(v => v.IsActive).Min(v => (double?)v.Price) ?? 0),
             "price_desc" => query.OrderByDescending(p => p.Variants.Where(v => v.IsActive).Min(v => (double?)v.Price) ?? 0),
+            "name_asc" => query.OrderBy(p => p.Name),
             _ => query.OrderByDescending(p => p.CreatedAt)
         };
 
-        var pagedEntities = await PagedResult<Product>.CreateAsync(query, pageIndex, pageSize);
-
-        var result = new PagedResult<ProductListItemDto>
-        {
-            TotalCount = pagedEntities.TotalCount,
-            PageIndex = pagedEntities.PageIndex,
-            PageSize = pagedEntities.PageSize,
-            Items = pagedEntities.Items.Select(p =>
-            {
-                var defaultVariant = p.Variants.FirstOrDefault(v => v.IsActive) ?? p.Variants.FirstOrDefault();
-                var primaryImage = p.Images.FirstOrDefault(i => i.IsPrimary) ?? p.Images.OrderBy(i => i.SortOrder).FirstOrDefault();
-
-                return new ProductListItemDto
-                {
-                    Id = p.Id,
-                    Name = p.Name,
-                    CategoryId = p.CategoryId,
-                    CategoryName = p.Category.Name,
-                    BrandId = p.BrandId,
-                    BrandName = p.Brand.Name,
-                    Price = defaultVariant?.Price ?? 0,
-                    CompareAtPrice = defaultVariant?.CompareAtPrice,
-                    PrimaryImageUrl = primaryImage?.ImageUrl,
-                    IsActive = p.IsActive,
-                    CreatedAt = p.CreatedAt
-                };
-            }).ToList()
-        };
-
-        return Ok(result);
+        var pagedEntities = await PagedResult<Product>.CreateAsync(query, currentPage, pageSize);
+        return Ok(MapToPagedProductList(pagedEntities));
     }
 
-    // 2. LẤY CHI TIẾT SẢN PHẨM
+    // 3. CHI TIẾT SẢN PHẨM (Kèm bộ ảnh, biến thể, thông số kỹ thuật & sản phẩm liên quan)
     [HttpGet("{id:long}")]
     public async Task<IActionResult> GetById(long id)
     {
         var product = await _context.Products
+            .AsNoTracking()
             .Include(p => p.Category)
             .Include(p => p.Brand)
             .Include(p => p.Images)
             .Include(p => p.Variants)
+            .Include(p => p.Specifications)
             .FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted);
 
         if (product == null)
             return NotFound(new { message = "Không tìm thấy sản phẩm." });
+
+        // Lấy tối đa 4 sản phẩm liên quan cùng danh mục
+        var relatedEntities = await _context.Products
+            .AsNoTracking()
+            .Include(p => p.Category)
+            .Include(p => p.Brand)
+            .Include(p => p.Variants)
+            .Include(p => p.Images)
+            .Where(p => !p.IsDeleted && p.IsActive && p.CategoryId == product.CategoryId && p.Id != product.Id)
+            .OrderByDescending(p => p.CreatedAt)
+            .Take(4)
+            .ToListAsync();
+
+        var activeVariants = product.Variants.Where(v => v.IsActive).ToList();
+        var priceSource = activeVariants.Count > 0 ? activeVariants : product.Variants.ToList();
 
         var dto = new ProductDetailDto
         {
@@ -114,28 +177,79 @@ public class ProductsController : ControllerBase
             CategoryName = product.Category.Name,
             BrandId = product.BrandId,
             BrandName = product.Brand.Name,
+            MinPrice = priceSource.Count > 0 ? priceSource.Min(v => v.Price) : 0,
+            MaxPrice = priceSource.Count > 0 ? priceSource.Max(v => v.Price) : 0,
             IsActive = product.IsActive,
             CreatedAt = product.CreatedAt,
-            Images = product.Images.OrderBy(i => i.SortOrder).Select(i => new ProductImageDto
-            {
-                Id = i.Id,
-                ImageUrl = i.ImageUrl,
-                IsPrimary = i.IsPrimary,
-                SortOrder = i.SortOrder
-            }).ToList(),
-            Variants = product.Variants.Select(v => new ProductVariantDto
-            {
-                Id = v.Id,
-                SKU = v.SKU,
-                Color = v.Color,
-                Storage = v.Storage,
-                Price = v.Price,
-                CompareAtPrice = v.CompareAtPrice,
-                IsActive = v.IsActive
-            }).ToList()
+            UpdatedAt = product.UpdatedAt,
+            Images = product.Images
+                .OrderByDescending(i => i.IsPrimary)
+                .ThenBy(i => i.SortOrder)
+                .Select(i => new ProductImageDto
+                {
+                    Id = i.Id,
+                    ImageUrl = i.ImageUrl,
+                    IsPrimary = i.IsPrimary,
+                    SortOrder = i.SortOrder
+                }).ToList(),
+            Variants = product.Variants
+                .OrderByDescending(v => v.IsActive)
+                .ThenBy(v => v.Price)
+                .Select(v => new ProductVariantDto
+                {
+                    Id = v.Id,
+                    SKU = v.SKU,
+                    Color = v.Color,
+                    Storage = v.Storage,
+                    Price = v.Price,
+                    CompareAtPrice = v.CompareAtPrice,
+                    IsActive = v.IsActive
+                }).ToList(),
+            Specifications = product.Specifications
+                .OrderBy(s => s.Id)
+                .Select(s => new ProductSpecificationDto
+                {
+                    Id = s.Id,
+                    SpecificationName = s.SpecificationName,
+                    SpecificationValue = s.SpecificationValue
+                }).ToList(),
+            RelatedProducts = relatedEntities.Select(MapToProductListItem).ToList()
         };
 
         return Ok(dto);
+    }
+
+    // --- HÀM MAP DỮ LIỆU DANH SÁCH SẢN PHẨM DÙNG CHUNG ---
+    private static PagedResult<ProductListItemDto> MapToPagedProductList(PagedResult<Product> pagedEntities)
+    {
+        return new PagedResult<ProductListItemDto>
+        {
+            TotalCount = pagedEntities.TotalCount,
+            PageIndex = pagedEntities.PageIndex,
+            PageSize = pagedEntities.PageSize,
+            Items = pagedEntities.Items.Select(MapToProductListItem).ToList()
+        };
+    }
+
+    private static ProductListItemDto MapToProductListItem(Product p)
+    {
+        var defaultVariant = p.Variants.FirstOrDefault(v => v.IsActive) ?? p.Variants.FirstOrDefault();
+        var primaryImage = p.Images.FirstOrDefault(i => i.IsPrimary) ?? p.Images.OrderBy(i => i.SortOrder).FirstOrDefault();
+
+        return new ProductListItemDto
+        {
+            Id = p.Id,
+            Name = p.Name,
+            CategoryId = p.CategoryId,
+            CategoryName = p.Category.Name,
+            BrandId = p.BrandId,
+            BrandName = p.Brand.Name,
+            Price = defaultVariant?.Price ?? 0,
+            CompareAtPrice = defaultVariant?.CompareAtPrice,
+            PrimaryImageUrl = primaryImage?.ImageUrl,
+            IsActive = p.IsActive,
+            CreatedAt = p.CreatedAt
+        };
     }
 
     // 3. THÊM SẢN PHẨM MỚI (Nhận multipart/form-data + IFormFile)

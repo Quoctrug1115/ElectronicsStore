@@ -18,6 +18,13 @@ public class ProductListItemDto
     public DateTime CreatedAt { get; set; }
 }
 
+public class ProductSpecificationDto
+{
+    public long Id { get; set; }
+    public string SpecificationName { get; set; } = string.Empty;
+    public string SpecificationValue { get; set; } = string.Empty;
+}
+
 public class ProductDetailDto
 {
     public long Id { get; set; }
@@ -27,10 +34,15 @@ public class ProductDetailDto
     public string CategoryName { get; set; } = string.Empty;
     public long BrandId { get; set; }
     public string BrandName { get; set; } = string.Empty;
+    public decimal MinPrice { get; set; }
+    public decimal MaxPrice { get; set; }
     public bool IsActive { get; set; }
     public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
     public List<ProductImageDto> Images { get; set; } = new();
     public List<ProductVariantDto> Variants { get; set; } = new();
+    public List<ProductSpecificationDto> Specifications { get; set; } = new();
+    public List<ProductListItemDto> RelatedProducts { get; set; } = new();
 }
 
 public class ProductImageDto
@@ -67,7 +79,6 @@ public class CreateProductRequest
     public string? Description { get; set; }
     public bool IsActive { get; set; } = true;
 
-    // Thông tin phiên bản (Variant) mặc định ban đầu
     [Required(ErrorMessage = "Mã SKU không được để trống")]
     [MaxLength(100)]
     public string SKU { get; set; } = string.Empty;
@@ -83,7 +94,6 @@ public class CreateProductRequest
 
     public decimal? CompareAtPrice { get; set; }
 
-    // Nhận 1 hoặc nhiều file ảnh qua multipart/form-data
     public List<IFormFile>? ImageFiles { get; set; }
 }
 
@@ -102,7 +112,6 @@ public class UpdateProductRequest
     public string? Description { get; set; }
     public bool IsActive { get; set; } = true;
 
-    // Cập nhật biến thể chính (nếu truyền lên)
     [MaxLength(100)]
     public string? SKU { get; set; }
     [MaxLength(50)]
@@ -112,6 +121,5 @@ public class UpdateProductRequest
     public decimal? Price { get; set; }
     public decimal? CompareAtPrice { get; set; }
 
-    // Khi người dùng upload ảnh mới lúc sửa -> xóa ảnh cũ trong wwwroot và thay bằng bộ ảnh mới
     public List<IFormFile>? ImageFiles { get; set; }
 }

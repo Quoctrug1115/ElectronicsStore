@@ -215,3 +215,30 @@ Authorization: Bearer {{loginMember.response.body.accessToken}}
 ### 22. Xóa 1 item khỏi giỏ hàng
 DELETE {{baseUrl}}/api/cart/items/{{addToCart.response.body.data.items[0].id}}
 Authorization: Bearer {{loginMember.response.body.accessToken}}
+
+### 23. Checkout giỏ hàng hiện tại (Transaction: Tạo Order + OrderItems + Xóa CartItems)
+# @name checkoutOrder
+POST {{baseUrl}}/api/orders/checkout
+Content-Type: application/json
+Authorization: Bearer {{loginMember.response.body.accessToken}}
+
+{
+  "recipientName": "Nguyễn Văn B",
+  "phoneNumber": "0912345677",
+  "shippingAddress": "123 Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP.HCM",
+  "paymentMethod": "COD",
+  "shippingFee": 30000,
+  "note": "Giao giờ hành chính"
+}
+
+### 24. Kiểm tra lại giỏ hàng sau khi Checkout (Kỳ vọng: items = [], totalItems = 0)
+GET {{baseUrl}}/api/cart
+Authorization: Bearer {{loginMember.response.body.accessToken}}
+
+### 25. Xem danh sách đơn hàng của User (có phân trang)
+GET {{baseUrl}}/api/orders?page=1&pageSize=10
+Authorization: Bearer {{loginMember.response.body.accessToken}}
+
+### 26. Xem chi tiết đơn hàng vừa đặt
+GET {{baseUrl}}/api/orders/{{checkoutOrder.response.body.data.id}}
+Authorization: Bearer {{loginMember.response.body.accessToken}}

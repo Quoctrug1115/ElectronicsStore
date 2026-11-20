@@ -4,3 +4,4 @@ Từ .NET 9/10, ASP.NET Core dùng sẵn AddOpenApi() + MapOpenApi() thay cho Ad
 
 # Test api trên file .http
 ## Test CRUD ở Backend bằng cách chạy mục 3, 7, 8, 9, 10 ở file .http
+## Test Order và Cart thì chục mục 3 đăng nhập trước

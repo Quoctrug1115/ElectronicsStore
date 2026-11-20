@@ -19,6 +19,10 @@ public class ElectronicsStoreContext : DbContext
     public DbSet<ProductSpecification> ProductSpecifications => Set<ProductSpecification>();
     public DbSet<Cart> Carts => Set<Cart>();
     public DbSet<CartItem> CartItems => Set<CartItem>();
+    public DbSet<Order> Orders => Set<Order>();
+    public DbSet<OrderItem> OrderItems => Set<OrderItem>();
+    public DbSet<OrderStatusHistory> OrderStatusHistories => Set<OrderStatusHistory>();
+    public DbSet<Payment> Payments => Set<Payment>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -125,6 +129,52 @@ public class ElectronicsStoreContext : DbContext
             entity.HasOne(ci => ci.Variant)
                   .WithMany()
                   .HasForeignKey(ci => ci.VariantId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<Order>(entity =>
+        {
+            entity.HasIndex(o => o.OrderCode).IsUnique();
+
+            entity.HasOne(o => o.User)
+                  .WithMany()
+                  .HasForeignKey(o => o.UserId)
+                  .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<OrderItem>(entity =>
+        {
+            entity.HasOne(oi => oi.Order)
+                  .WithMany(o => o.OrderItems)
+                  .HasForeignKey(oi => oi.OrderId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            // Restrict để chặn xóa biến thể sản phẩm đã phát sinh trong đơn hàng
+            entity.HasOne(oi => oi.Variant)
+                  .WithMany()
+                  .HasForeignKey(oi => oi.VariantId)
+                  .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<OrderStatusHistory>(entity =>
+        {
+            entity.ToTable("OrderStatusHistory");
+
+            entity.HasOne(h => h.Order)
+                  .WithMany(o => o.StatusHistories)
+                  .HasForeignKey(h => h.OrderId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(h => h.ChangedByUser)
+                  .WithMany()
+                  .HasForeignKey(h => h.ChangedBy)
+                  .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Payment>(entity =>
+        {
+            entity.HasOne(p => p.Order)
+                  .WithMany(o => o.Payments)
+                  .HasForeignKey(p => p.OrderId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
     }

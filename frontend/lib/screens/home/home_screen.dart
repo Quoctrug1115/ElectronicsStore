@@ -13,6 +13,7 @@ import '../../widgets/error_banner.dart';
 import '../member/product_detail_screen.dart';
 import '../member/category_products_screen.dart';
 import '../member/search_screen.dart';
+import '../member/member_product_list_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   HomeScreen({super.key});

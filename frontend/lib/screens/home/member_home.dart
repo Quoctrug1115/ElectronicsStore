@@ -23,7 +23,7 @@ class _MemberHomeState extends ConsumerState<MemberHome> {
     return Scaffold(
       body: IndexedStack(
         index: _index,
-        children: const [
+        children: [
           HomeScreen(),
           CartScreen(),
           AccountTab(isAdmin: false),

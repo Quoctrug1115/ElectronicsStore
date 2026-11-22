@@ -428,14 +428,50 @@ public class ProductsController : ControllerBase
         if (product == null)
             return NotFound(new { message = "Không tìm thấy sản phẩm." });
 
-        // Xóa toàn bộ file ảnh vật lý của sản phẩm trong wwwroot
+        // Sản phẩm đã nằm trong đơn hàng (hoặc giỏ hàng) thì không được xóa cứng:
+        // xóa mềm để giữ nguyên lịch sử đơn, giữ ảnh để đơn cũ vẫn hiển thị đúng.
+        var variantIds = await _context.ProductVariants
+            .Where(v => v.ProductId == id)
+            .Select(v => v.Id)
+            .ToListAsync();
+
+        bool inOrders = await _context.OrderItems.AnyAsync(oi => variantIds.Contains(oi.VariantId));
+        bool inCarts = await _context.CartItems.AnyAsync(ci => variantIds.Contains(ci.VariantId));
+
+        if (inOrders || inCarts)
+        {
+            product.IsDeleted = true;
+            product.IsActive = false;
+
+            if (inCarts)
+            {
+                // Gỡ khỏi giỏ hàng của mọi người dùng
+                var cartItems = await _context.CartItems
+                    .Where(ci => variantIds.Contains(ci.VariantId))
+                    .ToListAsync();
+                _context.CartItems.RemoveRange(cartItems);
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new
+            {
+                message = inOrders
+                    ? "Sản phẩm đã có trong đơn hàng nên được ẩn (xóa mềm) để giữ lịch sử đơn hàng."
+                    : "Đã xóa sản phẩm và gỡ khỏi giỏ hàng của người dùng.",
+                softDeleted = true
+            });
+        }
+
+        // Chưa phát sinh đơn: xóa cứng và xóa toàn bộ file ảnh vật lý trong wwwroot
         var imageUrls = product.Images.Select(i => i.ImageUrl).ToList();
-        _fileStorage.DeletePhysicalFiles(imageUrls);
 
         _context.ProductImages.RemoveRange(product.Images);
         _context.Products.Remove(product);
         await _context.SaveChangesAsync();
 
-        return Ok(new { message = "Xóa sản phẩm và toàn bộ ảnh đính kèm thành công." });
+        // Chỉ xóa file sau khi DB đã xóa thành công
+        _fileStorage.DeletePhysicalFiles(imageUrls);
+
+        return Ok(new { message = "Xóa sản phẩm và toàn bộ ảnh đính kèm thành công.", softDeleted = false });
     }
 }

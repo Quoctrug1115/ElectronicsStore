@@ -356,7 +356,7 @@ Widget _buildProductCard(ProductListItem p) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final hasDiscount = p.compareAtPrice != null && p.compareAtPrice! > p.price;
-    final isOutOfStock = !p.isActive;
+    final isOutOfStock = !p.inStock;
 
     return Card(
       clipBehavior: Clip.antiAlias,

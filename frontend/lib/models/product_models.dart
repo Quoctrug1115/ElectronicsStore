@@ -44,6 +44,7 @@ class ProductListItem {
   final double price;
   final double? compareAtPrice;
   final String? primaryImageUrl;
+  final int stockQuantity;
   final bool isActive;
   final DateTime createdAt;
 
@@ -57,9 +58,13 @@ class ProductListItem {
     required this.price,
     this.compareAtPrice,
     this.primaryImageUrl,
+    this.stockQuantity = 0,
     required this.isActive,
     required this.createdAt,
   });
+
+  /// Còn bán được: đang kinh doanh và còn tồn kho.
+  bool get inStock => isActive && stockQuantity > 0;
 
   String get fullPrimaryImageUrl {
     if (primaryImageUrl == null || primaryImageUrl!.isEmpty) return '';
@@ -76,6 +81,7 @@ class ProductListItem {
     price: (json['price'] as num).toDouble(),
     compareAtPrice: (json['compareAtPrice'] as num?)?.toDouble(),
     primaryImageUrl: json['primaryImageUrl'] as String?,
+    stockQuantity: (json['stockQuantity'] as num?)?.toInt() ?? 0,
     isActive: json['isActive'] as bool? ?? false,
     createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
         DateTime.now(),
@@ -115,6 +121,7 @@ class ProductVariant {
   final String? storage;
   final double price;
   final double? compareAtPrice;
+  final int stockQuantity;
   final bool isActive;
 
   const ProductVariant({
@@ -124,8 +131,12 @@ class ProductVariant {
     this.storage,
     required this.price,
     this.compareAtPrice,
+    this.stockQuantity = 0,
     required this.isActive,
   });
+
+  /// Còn bán được: biến thể đang hoạt động và còn tồn kho.
+  bool get inStock => isActive && stockQuantity > 0;
 
   factory ProductVariant.fromJson(Map<String, dynamic> json) => ProductVariant(
     id: (json['id'] as num).toInt(),
@@ -134,6 +145,7 @@ class ProductVariant {
     storage: json['storage'] as String?,
     price: (json['price'] as num).toDouble(),
     compareAtPrice: (json['compareAtPrice'] as num?)?.toDouble(),
+    stockQuantity: (json['stockQuantity'] as num?)?.toInt() ?? 0,
     isActive: json['isActive'] as bool? ?? false,
   );
 }
@@ -196,6 +208,7 @@ class ProductRequest {
   final String? storage;
   final double price;
   final double? compareAtPrice;
+  final int stockQuantity;
 
   const ProductRequest({
     required this.categoryId,
@@ -208,6 +221,7 @@ class ProductRequest {
     this.storage,
     required this.price,
     this.compareAtPrice,
+    this.stockQuantity = 0,
   });
 
   Map<String, String> toFormFields() {
@@ -221,6 +235,7 @@ class ProductRequest {
       'Color': color ?? '',
       'Storage': storage ?? '',
       'Price': price.toString(),
+      'StockQuantity': stockQuantity.toString(),
       if (compareAtPrice != null) 'CompareAtPrice': compareAtPrice!.toString(),
     };
   }

@@ -61,6 +61,21 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
     }
   }
 
+  /// Tồn kho của biến thể đang chọn.
+  int get _stock => _selectedVariant?.stockQuantity ?? 0;
+
+  /// Số lượng biến thể đang chọn đã có trong giỏ.
+  int get _inCart {
+    final cart = ref.read(cartProvider);
+    final vid = _selectedVariant?.id;
+    return cart.items
+        .where((i) => i.product.id == _product?.id && i.variant?.id == vid)
+        .fold(0, (sum, i) => sum + i.quantity);
+  }
+
+  bool get _canBuy =>
+      (_selectedVariant?.isActive ?? false) && _stock > 0 && _inCart < _stock;
+
   double get _currentPrice => _selectedVariant?.price ?? _product?.variants.first.price ?? 0.0;
 
   bool get _isInStock => _selectedVariant?.isActive ?? _product?.isActive ?? false;
@@ -386,17 +401,19 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                             margin: const EdgeInsets.only(top: 4),
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
-                              color: variant.isActive
+                              color: variant.inStock
                                   ? Colors.green.withValues(alpha: 0.1)
                                   : scheme.errorContainer,
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              variant.isActive ? 'Còn hàng' : 'Hết hàng',
+                              variant.inStock
+                                  ? 'Còn ${variant.stockQuantity} sản phẩm'
+                                  : 'Hết hàng',
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
-                                color: variant.isActive ? Colors.green : scheme.error,
+                                color: variant.inStock ? Colors.green : scheme.error,
                               ),
                             ),
                           ),
@@ -445,7 +462,9 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
               ),
               IconButton(
                 icon: const Icon(Icons.add),
-                onPressed: () => setState(() => _quantity++),
+                onPressed: _quantity < (_stock - _inCart)
+                    ? () => setState(() => _quantity++)
+                    : null,
                 constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                 padding: EdgeInsets.zero,
               ),
@@ -496,9 +515,11 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
             Expanded(
               flex: 2,
               child: FilledButton.icon(
-                onPressed: _addToCart,
+                onPressed: _canBuy ? _addToCart : null,
                 icon: const Icon(Icons.add_shopping_cart),
-                label: const Text('Thêm vào giỏ'),
+                label: Text(_stock <= 0 || !(_selectedVariant?.isActive ?? false)
+                    ? 'Hết hàng'
+                    : 'Thêm vào giỏ'),
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
@@ -512,6 +533,21 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
 
   void _addToCart() {
     final product = _product!;
+
+    // Kiểm tra tồn kho: số lượng thêm + số đã có trong giỏ không vượt quá tồn
+    final available = _stock - _inCart;
+    if (_quantity > available) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(available <= 0
+              ? 'Bạn đã thêm tối đa số lượng còn trong kho ($_stock).'
+              : 'Chỉ còn thêm được $available sản phẩm (kho còn $_stock).'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      setState(() => _quantity = available > 0 ? available : 1);
+      return;
+    }
     final cartItem = CartItem(
       product: ProductListItem(
         id: product.id,
@@ -523,6 +559,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
         price: _currentPrice,
         compareAtPrice: _selectedVariant?.compareAtPrice,
         primaryImageUrl: product.images.isNotEmpty ? product.images.first.imageUrl : null,
+        stockQuantity: _stock,
         isActive: product.isActive,
         createdAt: product.createdAt,
       ),
@@ -531,6 +568,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
     );
 
     ref.read(cartProvider.notifier).addItem(cartItem);
+    setState(() => _quantity = 1);
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

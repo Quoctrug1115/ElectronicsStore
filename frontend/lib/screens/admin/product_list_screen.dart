@@ -305,6 +305,16 @@ class _ProductListScreenState extends State<ProductListScreen> {
                       children: [
                         StatusPill(isActive: p.isActive),
                         Text(
+                          p.stockQuantity > 0 ? 'Tồn: ${p.stockQuantity}' : 'Hết hàng',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: p.stockQuantity > 0
+                                ? Theme.of(context).colorScheme.onSurfaceVariant
+                                : Theme.of(context).colorScheme.error,
+                          ),
+                        ),
+                        Text(
                           formatDate(p.createdAt),
                           style: TextStyle(color: muted, fontSize: 12),
                         ),

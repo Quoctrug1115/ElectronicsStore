@@ -312,10 +312,22 @@ class _QuantityControls extends ConsumerWidget {
             ),
             IconButton(
               icon: const Icon(Icons.add_circle_outline),
-              onPressed: () => cartNotifier.incrementQuantity(
-                item.product.id,
-                item.variant?.id,
-              ),
+              onPressed: () {
+                final stock = item.variant?.stockQuantity;
+                if (stock != null && item.quantity >= stock) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Chỉ còn $stock sản phẩm "${item.name}" trong kho.'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                  return;
+                }
+                cartNotifier.incrementQuantity(
+                  item.product.id,
+                  item.variant?.id,
+                );
+              },
               constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
               padding: EdgeInsets.zero,
             ),

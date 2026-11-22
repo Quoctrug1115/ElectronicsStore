@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 
@@ -37,6 +38,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   final _storageController = TextEditingController();
   final _priceController = TextEditingController();
   final _compareAtPriceController = TextEditingController();
+  final _stockController = TextEditingController(text: '0');
 
   List<CategoryResponse> _categories = [];
   List<BrandResponse> _brands = [];
@@ -86,6 +88,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         _price = firstVariant?.price ?? 0;
         _priceController.text = _price.toStringAsFixed(0);
         _compareAtPrice = firstVariant?.compareAtPrice;
+        _stockController.text = (firstVariant?.stockQuantity ?? 0).toString();
         _compareAtPriceController.text = _compareAtPrice != null
             ? _compareAtPrice!.toStringAsFixed(0)
             : '';
@@ -183,6 +186,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           : _storageController.text.trim(),
       price: price,
       compareAtPrice: compareAtPrice,
+      stockQuantity: int.tryParse(_stockController.text.trim()) ?? 0,
     );
 
     try {
@@ -350,6 +354,24 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                         prefixIcon: Icon(Icons.attach_money),
                         border: OutlineInputBorder(),
                       ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _stockController,
+                      enabled: !_saving,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: const InputDecoration(
+                        labelText: 'Số lượng tồn kho',
+                        prefixIcon: Icon(Icons.inventory_2_outlined),
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) {
+                        final n = int.tryParse(value?.trim() ?? '');
+                        if (n == null || n < 0) return 'Vui lòng nhập số lượng tồn kho (>= 0)';
+                        if (n > 1000000) return 'Tồn kho tối đa 1.000.000';
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 16),
                     TextFormField(

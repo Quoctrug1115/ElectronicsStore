@@ -32,6 +32,7 @@ public class CartItemDto
     public int Quantity { get; set; }
     public decimal LineTotal { get; set; }
     public string? PrimaryImageUrl { get; set; }
+    public int StockQuantity { get; set; }
     public bool IsAvailable { get; set; }
 }
 

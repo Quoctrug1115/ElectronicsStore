@@ -85,6 +85,21 @@ public class CartController : ControllerBase
         }
 
         var existingItem = cart.Items.FirstOrDefault(i => i.VariantId == request.VariantId);
+
+        // Kiểm tra tồn kho: tổng số lượng trong giỏ (cũ + mới) không được vượt quá tồn
+        var desiredQuantity = (existingItem?.Quantity ?? 0) + request.Quantity;
+        if (variant.StockQuantity <= 0)
+            return BadRequest(new { message = $"Sản phẩm '{variant.Product.Name}' đã hết hàng." });
+        if (desiredQuantity > variant.StockQuantity)
+        {
+            var inCart = existingItem?.Quantity ?? 0;
+            return BadRequest(new
+            {
+                message = $"Chỉ còn {variant.StockQuantity} sản phẩm '{variant.Product.Name}' trong kho" +
+                          (inCart > 0 ? $" (bạn đã có {inCart} trong giỏ)." : ".")
+            });
+        }
+
         if (existingItem != null)
         {
             existingItem.Quantity += request.Quantity;
@@ -128,6 +143,16 @@ public class CartController : ControllerBase
 
         if (!cartItem.Variant.IsActive || !cartItem.Variant.Product.IsActive || cartItem.Variant.Product.IsDeleted)
             return BadRequest(new { message = "Sản phẩm này hiện không còn khả dụng." });
+
+        if (request.Quantity > cartItem.Variant.StockQuantity)
+        {
+            return BadRequest(new
+            {
+                message = cartItem.Variant.StockQuantity <= 0
+                    ? $"Sản phẩm '{cartItem.Variant.Product.Name}' đã hết hàng."
+                    : $"Chỉ còn {cartItem.Variant.StockQuantity} sản phẩm '{cartItem.Variant.Product.Name}' trong kho."
+            });
+        }
 
         cartItem.Quantity = request.Quantity;
         cartItem.Cart.UpdatedAt = DateTime.UtcNow;
@@ -245,8 +270,9 @@ public class CartController : ControllerBase
                     CompareAtPrice = i.Variant.CompareAtPrice,
                     Quantity = i.Quantity,
                     LineTotal = i.Variant.Price * i.Quantity,
+                    StockQuantity = i.Variant.StockQuantity,
                     PrimaryImageUrl = primaryImage?.ImageUrl,
-                    IsAvailable = i.Variant.IsActive && product.IsActive && !product.IsDeleted
+                    IsAvailable = i.Variant.IsActive && product.IsActive && !product.IsDeleted && i.Variant.StockQuantity >= i.Quantity
                 };
             })
             .ToList();

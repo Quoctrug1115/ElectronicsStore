@@ -9,6 +9,7 @@ public class ProductVariant
     public string? Storage { get; set; }
     public decimal Price { get; set; }
     public decimal? CompareAtPrice { get; set; }
+    public int StockQuantity { get; set; } = 0;
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

@@ -86,7 +86,8 @@ public static class DbSeeder
                         Color = "Titan Tự Nhiên",
                         Storage = "256GB",
                         Price = 34990000,
-                        CompareAtPrice = 36990000
+                        CompareAtPrice = 36990000,
+                        StockQuantity = 50
                     }
                 }
             };

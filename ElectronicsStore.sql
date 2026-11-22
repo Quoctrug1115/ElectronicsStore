@@ -173,8 +173,12 @@ CREATE TABLE ProductVariants (
     Storage NVARCHAR(50),
     Price DECIMAL(18,2) NOT NULL,
     CompareAtPrice DECIMAL(18,2),
+    StockQuantity INT NOT NULL DEFAULT 0,
     IsActive BIT NOT NULL DEFAULT 1,
     CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+
+    CONSTRAINT CK_ProductVariants_StockQuantity
+        CHECK (StockQuantity >= 0),
 
     CONSTRAINT CK_ProductVariants_Price
         CHECK (Price >= 0),

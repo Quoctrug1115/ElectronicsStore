@@ -29,6 +29,26 @@ public class OrdersController : ControllerBase
     [HttpPost("checkout")]
     public async Task<IActionResult> Checkout([FromBody] CheckoutRequest request)
     {
+        // Nhiều người cùng đặt có thể gây deadlock hiếm gặp (SQL Server chọn 1 giao dịch làm nạn nhân,
+        // đã tự rollback) -> thử lại tối đa 3 lần với giỏ hàng/tồn kho đọc lại từ đầu.
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            try
+            {
+                return await CheckoutCoreAsync(request);
+            }
+            catch (Microsoft.Data.SqlClient.SqlException ex) when (ex.Number == 1205)
+            {
+                _context.ChangeTracker.Clear();
+                await Task.Delay(50 * attempt);
+            }
+        }
+
+        return StatusCode(409, new { message = "Hệ thống đang bận xử lý đơn khác. Vui lòng thử đặt hàng lại." });
+    }
+
+    private async Task<IActionResult> CheckoutCoreAsync(CheckoutRequest request)
+    {
         if (!TryGetCurrentUserId(out var userId))
             return Unauthorized();
 
@@ -74,6 +94,29 @@ public class OrdersController : ControllerBase
             var discountAmount = 0m;
             var shippingFee = request.ShippingFee;
             var totalAmount = subtotal - discountAmount + shippingFee;
+
+            // Trừ tồn kho nguyên tử: chỉ trừ khi còn đủ hàng (WHERE StockQuantity >= qty).
+            // Hai người mua cùng lúc không thể làm tồn kho âm; thiếu hàng thì rollback toàn bộ đơn.
+            // Luôn trừ theo thứ tự VariantId tăng dần để các giao dịch khóa dòng cùng thứ tự (tránh deadlock).
+            foreach (var item in cart.Items.GroupBy(i => i.VariantId).Select(g => new { VariantId = g.Key, Qty = g.Sum(x => x.Quantity) }).OrderBy(x => x.VariantId))
+            {
+                var affected = await _context.Database.ExecuteSqlInterpolatedAsync(
+                    $"UPDATE ProductVariants SET StockQuantity = StockQuantity - {item.Qty} WHERE Id = {item.VariantId} AND StockQuantity >= {item.Qty}");
+
+                if (affected == 0)
+                {
+                    await transaction.RollbackAsync();
+                    var v = cart.Items.First(i => i.VariantId == item.VariantId).Variant;
+                    var left = await _context.ProductVariants.AsNoTracking()
+                        .Where(x => x.Id == item.VariantId).Select(x => x.StockQuantity).FirstOrDefaultAsync();
+                    return BadRequest(new
+                    {
+                        message = left <= 0
+                            ? $"Sản phẩm '{v.Product.Name}' đã hết hàng. Vui lòng xóa khỏi giỏ trước khi đặt hàng."
+                            : $"Sản phẩm '{v.Product.Name}' chỉ còn {left} trong kho, bạn đang đặt {item.Qty}. Vui lòng giảm số lượng."
+                    });
+                }
+            }
 
             var orderCode = $"ORD-{now:yyyyMMddHHmmss}-{Random.Shared.Next(1000, 9999)}";
 

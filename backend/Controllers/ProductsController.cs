@@ -203,6 +203,7 @@ public class ProductsController : ControllerBase
                     Storage = v.Storage,
                     Price = v.Price,
                     CompareAtPrice = v.CompareAtPrice,
+                    StockQuantity = v.StockQuantity,
                     IsActive = v.IsActive
                 }).ToList(),
             Specifications = product.Specifications
@@ -247,6 +248,7 @@ public class ProductsController : ControllerBase
             Price = defaultVariant?.Price ?? 0,
             CompareAtPrice = defaultVariant?.CompareAtPrice,
             PrimaryImageUrl = primaryImage?.ImageUrl,
+            StockQuantity = defaultVariant?.StockQuantity ?? 0,
             IsActive = p.IsActive,
             CreatedAt = p.CreatedAt
         };
@@ -301,6 +303,7 @@ public class ProductsController : ControllerBase
             Storage = request.Storage?.Trim(),
             Price = request.Price,
             CompareAtPrice = request.CompareAtPrice,
+            StockQuantity = request.StockQuantity,
             IsActive = true,
             CreatedAt = DateTime.UtcNow
         });
@@ -365,6 +368,7 @@ public class ProductsController : ControllerBase
             if (request.Storage != null) primaryVariant.Storage = request.Storage.Trim();
             if (request.Price.HasValue) primaryVariant.Price = request.Price.Value;
             if (request.CompareAtPrice.HasValue) primaryVariant.CompareAtPrice = request.CompareAtPrice.Value;
+            if (request.StockQuantity.HasValue) primaryVariant.StockQuantity = request.StockQuantity.Value;
         }
 
         // Xử lý ảnh: Nếu người dùng upload ảnh mới -> lưu ảnh mới, xóa ảnh vật lý cũ trong wwwroot

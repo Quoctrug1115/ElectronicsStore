@@ -14,6 +14,7 @@ public class ProductListItemDto
     public decimal Price { get; set; }
     public decimal? CompareAtPrice { get; set; }
     public string? PrimaryImageUrl { get; set; }
+    public int StockQuantity { get; set; }
     public bool IsActive { get; set; }
     public DateTime CreatedAt { get; set; }
 }
@@ -61,6 +62,7 @@ public class ProductVariantDto
     public string? Storage { get; set; }
     public decimal Price { get; set; }
     public decimal? CompareAtPrice { get; set; }
+    public int StockQuantity { get; set; }
     public bool IsActive { get; set; }
 }
 
@@ -94,6 +96,9 @@ public class CreateProductRequest
 
     public decimal? CompareAtPrice { get; set; }
 
+    [Range(0, 1000000, ErrorMessage = "Số lượng tồn kho phải từ 0 đến 1.000.000")]
+    public int StockQuantity { get; set; }
+
     public List<IFormFile>? ImageFiles { get; set; }
 }
 
@@ -120,6 +125,9 @@ public class UpdateProductRequest
     public string? Storage { get; set; }
     public decimal? Price { get; set; }
     public decimal? CompareAtPrice { get; set; }
+
+    [Range(0, 1000000, ErrorMessage = "Số lượng tồn kho phải từ 0 đến 1.000.000")]
+    public int? StockQuantity { get; set; }
 
     public List<IFormFile>? ImageFiles { get; set; }
 }

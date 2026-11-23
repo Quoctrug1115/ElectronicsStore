@@ -360,4 +360,57 @@ public class OrdersController : ControllerBase
                 }).ToList()
         };
     }
+    // 4. MEMBER HỦY ĐƠN HÀNG CỦA CHÍNH MÌNH (Chỉ khi Pending hoặc Confirmed)
+    [HttpPost("{id:long}/cancel")]
+    public async Task<IActionResult> CancelMyOrder(long id)
+    {
+        if (!TryGetCurrentUserId(out var userId))
+            return Unauthorized();
+
+        var order = await _context.Orders
+            .Include(o => o.OrderItems)
+            .FirstOrDefaultAsync(o => o.Id == id && o.UserId == userId);
+
+        if (order == null)
+            return NotFound(new { message = "Không tìm thấy đơn hàng." });
+
+        if (order.Status != "Pending" && order.Status != "Confirmed")
+            return BadRequest(new { message = "Chỉ có thể hủy đơn hàng khi đang chờ xác nhận hoặc đã xác nhận." });
+
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            var now = DateTime.UtcNow;
+            var oldStatus = order.Status;
+
+            foreach (var item in order.OrderItems)
+            {
+                await _context.Database.ExecuteSqlInterpolatedAsync(
+                    $"UPDATE ProductVariants SET StockQuantity = StockQuantity + {item.Quantity} WHERE Id = {item.VariantId}");
+            }
+
+            order.Status = "Cancelled";
+            order.UpdatedAt = now;
+
+            _context.OrderStatusHistories.Add(new OrderStatusHistory
+            {
+                OrderId = order.Id,
+                OldStatus = oldStatus,
+                NewStatus = "Cancelled",
+                ChangedBy = userId,
+                Note = "Khách hàng tự hủy đơn hàng",
+                CreatedAt = now
+            });
+
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            return Ok(new { message = "Đã hủy đơn hàng thành công." });
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+    }
 }

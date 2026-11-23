@@ -1,0 +1,269 @@
+@baseUrl = http://localhost:5202
+@testEmail = lqtrung11152005@gmail.com
+
+### =========================================================
+### 0. ĐĂNG NHẬP LẤY TOKEN ADMIN & MEMBER
+### =========================================================
+
+# @name loginAdmin
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@electronics.com",
+  "password": "Admin@123"
+}
+
+### Tạo tài khoản Member mẫu để test Ngày 10 & 11
+# @name registerMember
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "fullName": "Nguyen Van Test",
+  "email": "member_test10@gmail.com",
+  "password": "Password@123",
+  "phoneNumber": "0909123456"
+}
+
+### Đăng nhập Member lấy Token
+# @name loginMember
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "member_test10@gmail.com",
+  "password": "Password@123"
+}
+
+
+### =========================================================
+### NGÀY 10: QUẢN TRỊ USER & ĐƠN HÀNG (ADMIN)
+### =========================================================
+
+### 10.1. Lấy danh sách toàn bộ User / Member (Có tìm kiếm & lọc)
+GET {{baseUrl}}/api/admin/users?pageIndex=1&pageSize=10&search=member
+Authorization: Bearer {{loginAdmin.response.body.accessToken}}
+
+### 10.2. Khóa tài khoản Member (Kỳ vọng: 200 OK, isLocked = true)
+PUT {{baseUrl}}/api/admin/users/{{loginMember.response.body.user.id}}/toggle-lock
+Authorization: Bearer {{loginAdmin.response.body.accessToken}}
+
+### 10.3. Thử đăng nhập bằng tài khoản vừa bị khóa (Kỳ vọng: 403 Forbidden)
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "member_test10@gmail.com",
+  "password": "Password@123"
+}
+
+### 10.4. Mở khóa lại tài khoản Member (Kỳ vọng: 200 OK, isLocked = false)
+PUT {{baseUrl}}/api/admin/users/{{loginMember.response.body.user.id}}/toggle-lock
+Authorization: Bearer {{loginAdmin.response.body.accessToken}}
+
+### 10.5. Đổi Role Member -> Admin
+PUT {{baseUrl}}/api/admin/users/{{loginMember.response.body.user.id}}/role
+Content-Type: application/json
+Authorization: Bearer {{loginAdmin.response.body.accessToken}}
+
+{
+  "role": "Admin"
+}
+
+### 10.6. Đổi Role Admin -> Member lại như cũ
+PUT {{baseUrl}}/api/admin/users/{{loginMember.response.body.user.id}}/role
+Content-Type: application/json
+Authorization: Bearer {{loginAdmin.response.body.accessToken}}
+
+{
+  "role": "Member"
+}
+
+### 10.7. Tạo dữ liệu đơn hàng mẫu (Thêm vào giỏ -> Checkout)
+POST {{baseUrl}}/api/cart/items
+Content-Type: application/json
+Authorization: Bearer {{loginMember.response.body.accessToken}}
+
+{
+  "variantId": 1,
+  "quantity": 1
+}
+
+### Checkout tạo đơn hàng
+# @name createOrder
+POST {{baseUrl}}/api/orders/checkout
+Content-Type: application/json
+Authorization: Bearer {{loginMember.response.body.accessToken}}
+
+{
+  "recipientName": "Nguyen Van Test",
+  "phoneNumber": "0909123456",
+  "shippingAddress": "123 Lê Lợi, Quận 1, TP.HCM",
+  "paymentMethod": "COD",
+  "shippingFee": 0,
+  "note": "Test đơn hàng ngày 10"
+}
+
+### 10.8. Admin lấy danh sách tất cả đơn hàng
+GET {{baseUrl}}/api/admin/orders?pageIndex=1&pageSize=10
+Authorization: Bearer {{loginAdmin.response.body.accessToken}}
+
+### 10.9. Admin xem chi tiết đơn hàng
+GET {{baseUrl}}/api/admin/orders/{{createOrder.response.body.data.id}}
+Authorization: Bearer {{loginAdmin.response.body.accessToken}}
+
+### 10.10. Admin cập nhật trạng thái: Chờ xác nhận -> Đang giao (Shipped)
+PUT {{baseUrl}}/api/admin/orders/{{createOrder.response.body.data.id}}/status
+Content-Type: application/json
+Authorization: Bearer {{loginAdmin.response.body.accessToken}}
+
+{
+  "status": "Đang giao",
+  "note": "Đã bàn giao cho đơn vị vận chuyển"
+}
+
+### 10.11. Admin cập nhật trạng thái: Đang giao -> Hoàn thành (Delivered)
+PUT {{baseUrl}}/api/admin/orders/{{createOrder.response.body.data.id}}/status
+Content-Type: application/json
+Authorization: Bearer {{loginAdmin.response.body.accessToken}}
+
+{
+  "status": "Hoàn thành",
+  "note": "Khách đã nhận hàng và thanh toán COD"
+}
+
+
+### =========================================================
+### NGÀY 11: CHECK SP TRONG ĐƠN, SP LIÊN QUAN & LỌC ĐƠN HÀNG
+### =========================================================
+
+### 11.1. Xóa sản phẩm ĐÃ CÓ trong đơn hàng (Kỳ vọng: 200 OK, softDeleted = true)
+DELETE {{baseUrl}}/api/products/1
+Authorization: Bearer {{loginAdmin.response.body.accessToken}}
+
+### 11.2. Lấy danh sách sản phẩm liên quan cùng CategoryId (có phân trang)
+GET {{baseUrl}}/api/products/1/related?page=1&pageSize=4
+
+### 11.3. Tìm kiếm & lọc đơn hàng phía User (keyword, fromDate, toDate)
+GET {{baseUrl}}/api/orders?page=1&pageSize=10&keyword=ORD&fromDate=2026-01-01&toDate=2026-12-31
+Authorization: Bearer {{loginMember.response.body.accessToken}}
+
+### 11.4. Tìm kiếm & lọc đơn hàng phía Admin (keyword, status, fromDate, toDate)
+GET {{baseUrl}}/api/admin/orders?page=1&pageSize=10&keyword=Nguyen&status=Delivered&fromDate=2026-01-01&toDate=2026-12-31
+Authorization: Bearer {{loginAdmin.response.body.accessToken}}
+
+
+### =========================================================
+### NGÀY 12: ẢNH DANH MỤC & OTP XÁC THỰC EMAIL / QUÊN MẬT KHẨU
+### =========================================================
+
+### 12.1. Tạo danh mục mới kèm upload ảnh (Lưu vào wwwroot/images/categories)
+# @name createCategoryImg
+POST {{baseUrl}}/api/categories
+Authorization: Bearer {{loginAdmin.response.body.accessToken}}
+Content-Type: multipart/form-data; boundary=CatBoundary
+
+--CatBoundary
+Content-Disposition: form-data; name="Name"
+
+Tai nghe không dây
+--CatBoundary
+Content-Disposition: form-data; name="Description"
+
+Tai nghe Bluetooth chống ồn
+--CatBoundary
+Content-Disposition: form-data; name="IsActive"
+
+true
+--CatBoundary
+Content-Disposition: form-data; name="ImageFile"; filename="nen1.jpg"
+Content-Type: image/jpeg
+
+< ./nen1.jpg
+--CatBoundary--
+
+### 12.2. Sửa danh mục & đổi ảnh mới (Tự động xóa ảnh cũ trên ổ đĩa)
+PUT {{baseUrl}}/api/categories/{{createCategoryImg.response.body.data.id}}
+Authorization: Bearer {{loginAdmin.response.body.accessToken}}
+Content-Type: multipart/form-data; boundary=CatBoundary
+
+--CatBoundary
+Content-Disposition: form-data; name="Name"
+
+Tai nghe & Loa Bluetooth
+--CatBoundary
+Content-Disposition: form-data; name="Description"
+
+Đã cập nhật ảnh mới
+--CatBoundary
+Content-Disposition: form-data; name="IsActive"
+
+true
+--CatBoundary
+Content-Disposition: form-data; name="ImageFile"; filename="test2.jpg"
+Content-Type: image/jpeg
+
+< ./test2.jpg
+--CatBoundary--
+
+### 12.3. Xóa danh mục (Tự động xóa luôn ảnh trong wwwroot/images/categories)
+DELETE {{baseUrl}}/api/categories/{{createCategoryImg.response.body.data.id}}
+Authorization: Bearer {{loginAdmin.response.body.accessToken}}
+
+### 12.4. Đăng ký bằng Email thật (Tự động gửi mã OTP 6 số qua Gmail)
+### (Lưu ý: Đổi biến @testEmail ở dòng 2 thành Gmail của bạn trước khi chạy)
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "fullName": "User Test OTP",
+  "email": "{{testEmail}}",
+  "password": "Quoctrung2006@",
+  "phoneNumber": "0988777666"
+}
+
+### 12.5. Gửi lại mã OTP xác thực Email (nếu cần)
+POST {{baseUrl}}/api/auth/send-verification-otp
+Content-Type: application/json
+
+{
+  "email": "{{testEmail}}"
+}
+
+### 12.6. Nhập mã OTP 6 số nhận được trong Gmail để kích hoạt tài khoản
+POST {{baseUrl}}/api/auth/verify-email
+Content-Type: application/json
+
+{
+  "email": "{{testEmail}}",
+  "otp": "123456"
+}
+
+### 12.7. Quên mật khẩu - Gửi mã OTP 6 số đặt lại mật khẩu qua Gmail
+POST {{baseUrl}}/api/auth/forgot-password
+Content-Type: application/json
+
+{
+  "email": "{{testEmail}}"
+}
+
+### 12.8. Nhập mã OTP 6 số từ Gmail để đặt lại mật khẩu mới
+POST {{baseUrl}}/api/auth/reset-password
+Content-Type: application/json
+
+{
+  "email": "{{testEmail}}",
+  "otp": "414398",
+  "newPassword": "NewPassword@123",
+  "confirmNewPassword": "NewPassword@123"
+}
+
+### 12.9. Đăng nhập lại bằng mật khẩu mới để kiểm tra
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{testEmail}}",
+  "password": "NewPassword@123"
+}

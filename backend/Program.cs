@@ -14,6 +14,8 @@ builder.Services.AddDbContext<ElectronicsStoreContext>(p => p.UseSqlServer(sqlSe
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<backend.Services.FileStorageService>();
+builder.Services.AddScoped<backend.Services.FileStorageService>();
+builder.Services.AddScoped<backend.Services.EmailService>();
 builder.Services.AddControllers();
 
 builder.Services.AddAuthentication(p =>

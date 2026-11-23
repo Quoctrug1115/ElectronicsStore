@@ -23,6 +23,7 @@ public class ElectronicsStoreContext : DbContext
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<OrderStatusHistory> OrderStatusHistories => Set<OrderStatusHistory>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<UserToken> UserTokens => Set<UserToken>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -175,6 +176,14 @@ public class ElectronicsStoreContext : DbContext
             entity.HasOne(p => p.Order)
                   .WithMany(o => o.Payments)
                   .HasForeignKey(p => p.OrderId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<UserToken>(entity =>
+        {
+            entity.HasOne(ut => ut.User)
+                  .WithMany()
+                  .HasForeignKey(ut => ut.UserId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
     }

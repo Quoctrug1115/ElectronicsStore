@@ -6,6 +6,7 @@ using System.Text.Json;
 using backend.Data;
 using backend.DTOs;
 using backend.Models;
+using backend.Services;
 using Google.Apis.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -20,14 +21,19 @@ public class AuthController : ControllerBase
 {
     private readonly ElectronicsStoreContext _context;
     private readonly IConfiguration _configuration;
+    private readonly EmailService _emailService;
 
-    public AuthController(ElectronicsStoreContext context, IConfiguration configuration)
+    public AuthController(
+        ElectronicsStoreContext context,
+        IConfiguration configuration,
+        EmailService emailService)
     {
         _context = context;
         _configuration = configuration;
+        _emailService = emailService;
     }
 
-    // 1. ĐĂNG KÝ
+    // 1. ĐĂNG KÝ (Tự động gửi mã OTP 6 số xác thực Email)
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
@@ -49,6 +55,7 @@ public class AuthController : ControllerBase
             Email = email,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
             PhoneNumber = request.PhoneNumber?.Trim(),
+            EmailConfirmed = false,
             IsActive = true,
             IsDeleted = false,
             CreatedAt = DateTime.UtcNow
@@ -64,10 +71,157 @@ public class AuthController : ControllerBase
         });
         await _context.SaveChangesAsync();
 
+        bool otpSent = true;
+        try
+        {
+            var otp = await CreateOtpTokenAsync(user.Id, "EmailConfirm");
+            await _emailService.SendOtpEmailAsync(user.Email, user.FullName, otp, "EmailConfirm");
+        }
+        catch
+        {
+            otpSent = false;
+        }
+
         var roles = new List<string> { memberRole.Name };
         var authResult = await GenerateAuthResponseAsync(user, roles);
 
-        return Ok(authResult);
+        return Ok(new
+        {
+            message = otpSent
+                ? "Đăng ký thành công. Mã OTP xác thực 6 số đã được gửi tới email của bạn."
+                : "Đăng ký thành công nhưng chưa gửi được email OTP. Vui lòng kiểm tra cấu hình SMTP hoặc bấm gửi lại mã.",
+            otpSent,
+            authResult.AccessToken,
+            authResult.RefreshToken,
+            authResult.ExpiresAt,
+            authResult.User
+        });
+    }
+
+    // 1b. GỬI / GỬI LẠI MÃ OTP XÁC THỰC EMAIL
+    [HttpPost("send-verification-otp")]
+    public async Task<IActionResult> SendVerificationOtp([FromBody] SendOtpRequest request)
+    {
+        var email = request.Email.Trim().ToLower();
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
+
+        if (user == null)
+            return NotFound(new { message = "Không tìm thấy tài khoản với email này." });
+
+        if (!user.IsActive)
+            return StatusCode(403, new { message = "Tài khoản đã bị vô hiệu hóa." });
+
+        if (user.EmailConfirmed)
+            return BadRequest(new { message = "Tài khoản này đã được xác thực email trước đó." });
+
+        var recentToken = await _context.UserTokens
+            .Where(t => t.UserId == user.Id && t.Type == "EmailConfirm" && t.UsedAt == null)
+            .OrderByDescending(t => t.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        if (recentToken != null && (DateTime.UtcNow - recentToken.CreatedAt).TotalSeconds < 60)
+            return BadRequest(new { message = "Vui lòng đợi 60 giây trước khi yêu cầu gửi lại mã OTP." });
+
+        var otp = await CreateOtpTokenAsync(user.Id, "EmailConfirm");
+        await _emailService.SendOtpEmailAsync(user.Email, user.FullName, otp, "EmailConfirm");
+
+        return Ok(new { message = "Đã gửi mã OTP 6 số đến email của bạn. Mã có hiệu lực trong 10 phút." });
+    }
+
+    // 1c. XÁC NHẬN MÃ OTP KÍCH HOẠT TÀI KHOẢN
+    [HttpPost("verify-email")]
+    public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailOtpRequest request)
+    {
+        var email = request.Email.Trim().ToLower();
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
+
+        if (user == null)
+            return NotFound(new { message = "Không tìm thấy tài khoản với email này." });
+
+        if (user.EmailConfirmed)
+            return Ok(new { message = "Email đã được xác thực trước đó.", emailConfirmed = true });
+
+        var token = await ValidateOtpTokenAsync(user.Id, request.Otp.Trim(), "EmailConfirm");
+        if (token == null)
+            return BadRequest(new { message = "Mã OTP không chính xác hoặc đã hết hạn." });
+
+        var now = DateTime.UtcNow;
+        token.UsedAt = now;
+        user.EmailConfirmed = true;
+        user.UpdatedAt = now;
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new
+        {
+            message = "Xác thực email thành công! Tài khoản của bạn đã được kích hoạt.",
+            emailConfirmed = true
+        });
+    }
+
+    // 1d. QUÊN MẬT KHẨU - GỬI MÃ OTP 6 SỐ QUA GMAIL
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+    {
+        var email = request.Email.Trim().ToLower();
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
+
+        if (user == null)
+            return NotFound(new { message = "Email này chưa được đăng ký trong hệ thống." });
+
+        if (!user.IsActive)
+            return StatusCode(403, new { message = "Tài khoản đã bị vô hiệu hóa." });
+
+        var recentToken = await _context.UserTokens
+            .Where(t => t.UserId == user.Id && t.Type == "ResetPassword" && t.UsedAt == null)
+            .OrderByDescending(t => t.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        if (recentToken != null && (DateTime.UtcNow - recentToken.CreatedAt).TotalSeconds < 60)
+            return BadRequest(new { message = "Vui lòng đợi 60 giây trước khi yêu cầu gửi lại mã OTP." });
+
+        var otp = await CreateOtpTokenAsync(user.Id, "ResetPassword");
+        await _emailService.SendOtpEmailAsync(user.Email, user.FullName, otp, "ResetPassword");
+
+        return Ok(new { message = "Mã OTP đặt lại mật khẩu (6 số) đã được gửi tới email của bạn." });
+    }
+
+    // 1e. ĐẶT LẠI MẬT KHẨU BẰNG MÃ OTP 6 SỐ
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+    {
+        var email = request.Email.Trim().ToLower();
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
+
+        if (user == null)
+            return NotFound(new { message = "Không tìm thấy tài khoản với email này." });
+
+        if (!user.IsActive)
+            return StatusCode(403, new { message = "Tài khoản đã bị vô hiệu hóa." });
+
+        var token = await ValidateOtpTokenAsync(user.Id, request.Otp.Trim(), "ResetPassword");
+        if (token == null)
+            return BadRequest(new { message = "Mã OTP không chính xác hoặc đã hết hạn." });
+
+        var now = DateTime.UtcNow;
+        token.UsedAt = now;
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+        user.EmailConfirmed = true;
+        user.UpdatedAt = now;
+
+        var activeTokens = await _context.RefreshTokens
+            .Where(rt => rt.UserId == user.Id && rt.RevokedAt == null && rt.ExpiresAt > now)
+            .ToListAsync();
+
+        foreach (var rt in activeTokens)
+        {
+            rt.RevokedAt = now;
+        }
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new { message = "Đặt lại mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới." });
     }
 
     // 2. ĐĂNG NHẬP (Trả về JWT chứa Claim Role)
@@ -140,7 +294,7 @@ public class AuthController : ControllerBase
             {
                 FullName = string.IsNullOrWhiteSpace(payload.Name) ? email : payload.Name.Trim(),
                 Email = email,
-                PasswordHash = null, // tài khoản mạng xã hội chưa có mật khẩu
+                PasswordHash = null,
                 EmailConfirmed = true,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow
@@ -163,7 +317,7 @@ public class AuthController : ControllerBase
 
             if (!user.EmailConfirmed)
             {
-                user.EmailConfirmed = true; // Google đã xác minh email
+                user.EmailConfirmed = true;
                 user.UpdatedAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
             }
@@ -201,7 +355,6 @@ public class AuthController : ControllerBase
             return StatusCode(502, new { message = "Không kết nối được máy chủ Zalo." });
         }
 
-        // Zalo không trả email -> dùng email giả định danh theo Zalo ID
         var email = $"zalo_{zaloId}@zalo.local";
 
         var user = await _context.Users
@@ -258,7 +411,6 @@ public class AuthController : ControllerBase
         {
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
 
-            // 1) debug_token: chống dùng token của app khác
             var debugUrl = "https://graph.facebook.com/debug_token"
                 + $"?input_token={Uri.EscapeDataString(request.AccessToken)}"
                 + $"&access_token={Uri.EscapeDataString($"{appId}|{appSecret}")}";
@@ -270,7 +422,6 @@ public class AuthController : ControllerBase
                     return Unauthorized(new { message = "Token Facebook không hợp lệ hoặc đã hết hạn." });
             }
 
-            // 2) Lấy thông tin người dùng
             var meUrl = "https://graph.facebook.com/v19.0/me?fields=id,name,email"
                 + $"&access_token={Uri.EscapeDataString(request.AccessToken)}";
             using var meDoc = JsonDocument.Parse(await http.GetStringAsync(meUrl));
@@ -284,7 +435,6 @@ public class AuthController : ControllerBase
             return Unauthorized(new { message = "Không xác minh được tài khoản Facebook." });
         }
 
-        // Facebook có thể không trả email -> dùng email giả định danh theo Facebook ID
         var email = string.IsNullOrWhiteSpace(fbEmail)
             ? $"fb_{fbId}@facebook.local"
             : fbEmail.Trim().ToLower();
@@ -352,7 +502,6 @@ public class AuthController : ControllerBase
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
         user.UpdatedAt = DateTime.UtcNow;
 
-        // Thu hồi toàn bộ Refresh Token đang hoạt động để buộc đăng nhập lại trên thiết bị khác
         var activeTokens = await _context.RefreshTokens
             .Where(rt => rt.UserId == user.Id && rt.RevokedAt == null && rt.ExpiresAt > DateTime.UtcNow)
             .ToListAsync();
@@ -380,6 +529,56 @@ public class AuthController : ControllerBase
         });
     }
 
+    // --- HÀM HỖ TRỢ TẠO / KIỂM TRA OTP 6 SỐ (BĂM SHA-256 LƯU VÀO UserTokens) ---
+    private async Task<string> CreateOtpTokenAsync(long userId, string type)
+    {
+        var now = DateTime.UtcNow;
+
+        var oldTokens = await _context.UserTokens
+            .Where(t => t.UserId == userId && t.Type == type && t.UsedAt == null && t.ExpiresAt > now)
+            .ToListAsync();
+
+        foreach (var old in oldTokens)
+        {
+            old.UsedAt = now;
+        }
+
+        var otpCode = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
+
+        _context.UserTokens.Add(new UserToken
+        {
+            UserId = userId,
+            TokenHash = HashOtp(otpCode),
+            Type = type,
+            ExpiresAt = now.AddMinutes(10),
+            CreatedAt = now
+        });
+
+        await _context.SaveChangesAsync();
+        return otpCode;
+    }
+
+    private async Task<UserToken?> ValidateOtpTokenAsync(long userId, string otpCode, string type)
+    {
+        var now = DateTime.UtcNow;
+        var otpHash = HashOtp(otpCode);
+
+        return await _context.UserTokens
+            .Where(t => t.UserId == userId
+                        && t.Type == type
+                        && t.UsedAt == null
+                        && t.ExpiresAt > now
+                        && t.TokenHash == otpHash)
+            .OrderByDescending(t => t.CreatedAt)
+            .FirstOrDefaultAsync();
+    }
+
+    private static string HashOtp(string otp)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(otp));
+        return Convert.ToHexString(bytes);
+    }
+
     // --- HÀM HỖ TRỢ SINH JWT + REFRESH TOKEN ---
     private async Task<AuthResponse> GenerateAuthResponseAsync(User user, List<string> roles)
     {
@@ -394,7 +593,6 @@ public class AuthController : ControllerBase
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
-        // Gắn từng Role vào Claim để [Authorize(Roles = "...")] hoạt động
         foreach (var role in roles)
         {
             claims.Add(new Claim(ClaimTypes.Role, role));
@@ -414,7 +612,6 @@ public class AuthController : ControllerBase
 
         var accessToken = new JwtSecurityTokenHandler().WriteToken(tokenDescriptor);
 
-        // Sinh Refresh Token lưu xuống bảng RefreshTokens
         var refreshTokenValue = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
         var refreshToken = new RefreshToken
         {
@@ -438,6 +635,7 @@ public class AuthController : ControllerBase
                 FullName = user.FullName,
                 Email = user.Email,
                 PhoneNumber = user.PhoneNumber,
+                EmailConfirmed = user.EmailConfirmed,
                 Roles = roles
             }
         };

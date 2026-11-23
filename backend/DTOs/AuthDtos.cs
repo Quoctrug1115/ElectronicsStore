@@ -77,5 +77,50 @@ public class UserInfoDto
     public string FullName { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public string? PhoneNumber { get; set; }
+    public bool EmailConfirmed { get; set; }
     public List<string> Roles { get; set; } = new();
+}
+
+public class SendOtpRequest
+{
+    [Required(ErrorMessage = "Email không được để trống")]
+    [EmailAddress(ErrorMessage = "Email không đúng định dạng")]
+    public string Email { get; set; } = string.Empty;
+}
+
+public class VerifyEmailOtpRequest
+{
+    [Required(ErrorMessage = "Email không được để trống")]
+    [EmailAddress(ErrorMessage = "Email không đúng định dạng")]
+    public string Email { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "Vui lòng nhập mã OTP")]
+    [RegularExpression(@"^\d{6}$", ErrorMessage = "Mã OTP phải gồm đúng 6 chữ số")]
+    public string Otp { get; set; } = string.Empty;
+}
+
+public class ForgotPasswordRequest
+{
+    [Required(ErrorMessage = "Email không được để trống")]
+    [EmailAddress(ErrorMessage = "Email không đúng định dạng")]
+    public string Email { get; set; } = string.Empty;
+}
+
+public class ResetPasswordRequest
+{
+    [Required(ErrorMessage = "Email không được để trống")]
+    [EmailAddress(ErrorMessage = "Email không đúng định dạng")]
+    public string Email { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "Vui lòng nhập mã OTP")]
+    [RegularExpression(@"^\d{6}$", ErrorMessage = "Mã OTP phải gồm đúng 6 chữ số")]
+    public string Otp { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "Vui lòng nhập mật khẩu mới")]
+    [MinLength(6, ErrorMessage = "Mật khẩu mới tối thiểu 6 ký tự")]
+    public string NewPassword { get; set; } = string.Empty;
+
+    [Required]
+    [Compare(nameof(NewPassword), ErrorMessage = "Xác nhận mật khẩu mới không khớp")]
+    public string ConfirmNewPassword { get; set; } = string.Empty;
 }

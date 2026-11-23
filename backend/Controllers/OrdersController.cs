@@ -196,16 +196,22 @@ public class OrdersController : ControllerBase
         }
     }
 
-    // 2. XEM DANH SÁCH ĐƠN HÀNG CỦA USER (CÓ PHÂN TRANG & LỌC TRẠNG THÁI)
+// 2. XEM DANH SÁCH ĐƠN HÀNG CỦA USER (PHÂN TRANG, TÌM KIẾM & LỌC NGÀY/TRẠNG THÁI)
     [HttpGet]
     public async Task<IActionResult> GetMyOrders(
         [FromQuery] int? page = null,
         [FromQuery] int pageIndex = 1,
         [FromQuery] int pageSize = 10,
-        [FromQuery] string? status = null)
+        [FromQuery] string? status = null,
+        [FromQuery] string? keyword = null,
+        [FromQuery] DateTime? fromDate = null,
+        [FromQuery] DateTime? toDate = null)
     {
         if (!TryGetCurrentUserId(out var userId))
             return Unauthorized();
+
+        if (fromDate.HasValue && toDate.HasValue && fromDate.Value.Date > toDate.Value.Date)
+            return BadRequest(new { message = "Ngày bắt đầu (fromDate) không được lớn hơn ngày kết thúc (toDate)." });
 
         int currentPage = page ?? pageIndex;
 
@@ -219,10 +225,48 @@ public class OrdersController : ControllerBase
             .Where(o => o.UserId == userId)
             .AsQueryable();
 
+        // Lọc theo trạng thái (chuẩn hóa cả 'shipping' từ Flutter thành 'Shipped' trong DB)
         if (!string.IsNullOrWhiteSpace(status))
         {
-            var normalizedStatus = status.Trim();
+            var normalizedStatus = status.Trim().ToLowerInvariant() switch
+            {
+                "pending" or "chờ xác nhận" => "Pending",
+                "confirmed" or "đã xác nhận" => "Confirmed",
+                "processing" or "đang xử lý" => "Processing",
+                "shipping" or "shipped" or "đang giao" => "Shipped",
+                "delivered" or "đã giao" or "hoàn thành" => "Delivered",
+                "cancelled" or "đã hủy" or "hủy" => "Cancelled",
+                "returned" or "đã trả hàng" => "Returned",
+                _ => status.Trim()
+            };
             query = query.Where(o => o.Status == normalizedStatus);
+        }
+
+        // Tìm kiếm theo mã đơn, tên/SĐT người nhận hoặc tên/SKU sản phẩm trong đơn
+        if (!string.IsNullOrWhiteSpace(keyword))
+        {
+            var pattern = $"%{keyword.Trim()}%";
+            query = query.Where(o =>
+                EF.Functions.Like(o.OrderCode, pattern) ||
+                EF.Functions.Like(o.RecipientName, pattern) ||
+                EF.Functions.Like(o.PhoneNumber, pattern) ||
+                o.OrderItems.Any(oi =>
+                    EF.Functions.Like(oi.ProductName, pattern) ||
+                    EF.Functions.Like(oi.SKU, pattern)));
+        }
+
+        // Lọc từ ngày (00:00:00)
+        if (fromDate.HasValue)
+        {
+            var fromUtc = fromDate.Value.Date;
+            query = query.Where(o => o.CreatedAt >= fromUtc);
+        }
+
+        // Lọc đến hết ngày (23:59:59.999)
+        if (toDate.HasValue)
+        {
+            var toExclusive = toDate.Value.Date.AddDays(1);
+            query = query.Where(o => o.CreatedAt < toExclusive);
         }
 
         query = query.OrderByDescending(o => o.CreatedAt);
@@ -260,7 +304,7 @@ public class OrdersController : ControllerBase
 
         return Ok(result);
     }
-
+    
     // 3. XEM CHI TIẾT ĐƠN HÀNG CỦA USER THEO ID
     [HttpGet("{id:long}")]
     public async Task<IActionResult> GetOrderById(long id)

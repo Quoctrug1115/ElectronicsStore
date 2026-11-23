@@ -220,6 +220,39 @@ public class ProductsController : ControllerBase
         return Ok(dto);
     }
 
+    // 3b. LẤY SẢN PHẨM LIÊN QUAN CÙNG DANH MỤC (CÓ PHÂN TRANG)
+    // Hỗ trợ cả ?page=1 lẫn ?pageIndex=1
+    [HttpGet("{id:long}/related")]
+    public async Task<IActionResult> GetRelatedProducts(
+        long id,
+        [FromQuery] int? page = null,
+        [FromQuery] int pageIndex = 1,
+        [FromQuery] int pageSize = 6)
+    {
+        var categoryId = await _context.Products
+            .AsNoTracking()
+            .Where(p => p.Id == id && !p.IsDeleted)
+            .Select(p => (long?)p.CategoryId)
+            .FirstOrDefaultAsync();
+
+        if (categoryId == null)
+            return NotFound(new { message = "Không tìm thấy sản phẩm." });
+
+        int currentPage = page ?? pageIndex;
+
+        var query = _context.Products
+            .AsNoTracking()
+            .Include(p => p.Category)
+            .Include(p => p.Brand)
+            .Include(p => p.Variants)
+            .Include(p => p.Images)
+            .Where(p => !p.IsDeleted && p.IsActive && p.CategoryId == categoryId.Value && p.Id != id)
+            .OrderByDescending(p => p.CreatedAt);
+
+        var pagedEntities = await PagedResult<Product>.CreateAsync(query, currentPage, pageSize);
+        return Ok(MapToPagedProductList(pagedEntities));
+    }
+
     // --- HÀM MAP DỮ LIỆU DANH SÁCH SẢN PHẨM DÙNG CHUNG ---
     private static PagedResult<ProductListItemDto> MapToPagedProductList(PagedResult<Product> pagedEntities)
     {
@@ -254,7 +287,7 @@ public class ProductsController : ControllerBase
         };
     }
 
-    // 3. THÊM SẢN PHẨM MỚI (Nhận multipart/form-data + IFormFile)
+    // 4. THÊM SẢN PHẨM MỚI (Nhận multipart/form-data + IFormFile)
     [Authorize(Roles = "Admin")]
     [HttpPost]
     public async Task<IActionResult> Create([FromForm] CreateProductRequest request)
@@ -329,7 +362,7 @@ public class ProductsController : ControllerBase
         });
     }
 
-    // 4. CẬP NHẬT SẢN PHẨM (Xóa file ảnh cũ trong wwwroot khi upload ảnh mới)
+    // 5. CẬP NHẬT SẢN PHẨM (Xóa file ảnh cũ trong wwwroot khi upload ảnh mới)
     [Authorize(Roles = "Admin")]
     [HttpPut("{id:long}")]
     public async Task<IActionResult> Update(long id, [FromForm] UpdateProductRequest request)
@@ -420,7 +453,7 @@ public class ProductsController : ControllerBase
         return Ok(new { message = "Cập nhật sản phẩm thành công." });
     }
 
-    // 5. XÓA SẢN PHẨM (Xóa sạch file ảnh vật lý trong wwwroot)
+    // 6. XÓA SẢN PHẨM (Check SP trong đơn hàng -> Xóa mềm; ngược lại xóa cứng & xóa ảnh wwwroot)
     [Authorize(Roles = "Admin")]
     [HttpDelete("{id:long}")]
     public async Task<IActionResult> Delete(long id)
@@ -434,24 +467,20 @@ public class ProductsController : ControllerBase
 
         // Sản phẩm đã nằm trong đơn hàng (hoặc giỏ hàng) thì không được xóa cứng:
         // xóa mềm để giữ nguyên lịch sử đơn, giữ ảnh để đơn cũ vẫn hiển thị đúng.
-        var variantIds = await _context.ProductVariants
-            .Where(v => v.ProductId == id)
-            .Select(v => v.Id)
-            .ToListAsync();
-
-        bool inOrders = await _context.OrderItems.AnyAsync(oi => variantIds.Contains(oi.VariantId));
-        bool inCarts = await _context.CartItems.AnyAsync(ci => variantIds.Contains(ci.VariantId));
+        bool inOrders = await _context.OrderItems.AnyAsync(oi => oi.Variant.ProductId == id);
+        bool inCarts = await _context.CartItems.AnyAsync(ci => ci.Variant.ProductId == id);
 
         if (inOrders || inCarts)
         {
             product.IsDeleted = true;
             product.IsActive = false;
+            product.UpdatedAt = DateTime.UtcNow;
 
             if (inCarts)
             {
                 // Gỡ khỏi giỏ hàng của mọi người dùng
                 var cartItems = await _context.CartItems
-                    .Where(ci => variantIds.Contains(ci.VariantId))
+                    .Where(ci => ci.Variant.ProductId == id)
                     .ToListAsync();
                 _context.CartItems.RemoveRange(cartItems);
             }

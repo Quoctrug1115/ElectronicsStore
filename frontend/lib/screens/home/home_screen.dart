@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/format.dart';
-import '../../models/cart_models.dart';
 import '../../models/category_models.dart';
 import '../../models/product_models.dart';
 import '../../providers/cart_provider.dart';
@@ -248,7 +247,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildCategoryBar() {
     if (_isLoadingCategories) {
       return SizedBox(
-        height: 100,
+        height: 124,
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -276,7 +275,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ];
 
     return SizedBox(
-      height: 100,
+      height: 124,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -339,11 +338,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
           ),
           if (onSeeAll != null)
             TextButton(onPressed: onSeeAll, child: const Text('Xem tất cả')),

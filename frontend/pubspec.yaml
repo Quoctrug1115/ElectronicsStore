@@ -43,6 +43,10 @@ dependencies:
   # State management
   flutter_riverpod: ^2.6.1
   riverpod_annotation: ^2.6.1
+  google_sign_in: ^7.2.0
+  zalo_flutter:
+    path: packages/zalo_flutter
+  flutter_facebook_auth: ^7.1.5
 dev_dependencies:
   flutter_test:
     sdk: flutter

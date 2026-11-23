@@ -31,6 +31,21 @@ class AuthService {
     return AuthResponse.fromJson(data as Map<String, dynamic>);
   }
 
+  Future<AuthResponse> loginWithGoogle(String idToken) async {
+    final data = await _post(ApiConfig.googleLogin, {'idToken': idToken});
+    return AuthResponse.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<AuthResponse> loginWithZalo(String accessToken) async {
+    final data = await _post(ApiConfig.zaloLogin, {'accessToken': accessToken});
+    return AuthResponse.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<AuthResponse> loginWithFacebook(String accessToken) async {
+    final data = await _post(ApiConfig.facebookLogin, {'accessToken': accessToken});
+    return AuthResponse.fromJson(data as Map<String, dynamic>);
+  }
+
   Future<String> changePassword(
     ChangePasswordRequest request, {
     required String accessToken,

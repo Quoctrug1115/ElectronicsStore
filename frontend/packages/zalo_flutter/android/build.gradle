@@ -1,0 +1,38 @@
+group 'com.tiendung01023.zalo_flutter'
+version '1.0-SNAPSHOT'
+
+// Đã chỉnh cho Gradle 9 / AGP 9 (bản gốc 0.0.8 dùng jcenter, Kotlin 1.5, AGP 4.1)
+rootProject.allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven {
+            url "https://gitlab.com/api/v4/projects/50747855/packages/maven"
+        }
+    }
+}
+
+apply plugin: 'com.android.library'
+
+android {
+    namespace 'com.tiendung01023.zalo_flutter'
+    compileSdk 36
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    sourceSets {
+        main.java.srcDirs += 'src/main/kotlin'
+    }
+    defaultConfig {
+        minSdk 21
+    }
+}
+
+dependencies {
+    api "me.zalo:sdk-core:+"
+    api "me.zalo:sdk-auth:+"
+    api "me.zalo:sdk-openapi:+"
+}

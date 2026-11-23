@@ -10,9 +10,13 @@ class ApiConfig {
 
   static const String register = '/api/auth/register';
   static const String login = '/api/auth/login';
+  static const String googleLogin = '/api/auth/google';
+  static const String zaloLogin = '/api/auth/zalo';
+  static const String facebookLogin = '/api/auth/facebook';
   static const String changePassword = '/api/auth/change-password';
   static const String categories = '/api/categories';
   static const String brands = '/api/brands';
   static const String products = '/api/products';
   static const String orders = '/api/orders';
 }
+

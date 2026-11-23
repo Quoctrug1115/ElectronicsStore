@@ -31,6 +31,24 @@ public class LoginRequest
     public string Password { get; set; } = string.Empty;
 }
 
+public class GoogleLoginRequest
+{
+    [Required(ErrorMessage = "Thiếu idToken của Google")]
+    public string IdToken { get; set; } = string.Empty;
+}
+
+public class ZaloLoginRequest
+{
+    [Required(ErrorMessage = "Thiếu accessToken của Zalo")]
+    public string AccessToken { get; set; } = string.Empty;
+}
+
+public class FacebookLoginRequest
+{
+    [Required(ErrorMessage = "Thiếu accessToken của Facebook")]
+    public string AccessToken { get; set; } = string.Empty;
+}
+
 public class ChangePasswordRequest
 {
     [Required(ErrorMessage = "Vui lòng nhập mật khẩu hiện tại")]

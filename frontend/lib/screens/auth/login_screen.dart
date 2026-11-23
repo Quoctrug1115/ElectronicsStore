@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../../core/token_storage.dart';
 import '../../models/auth_models.dart';
 import '../../services/auth_service.dart';
+import '../../services/facebook_auth_service.dart';
+import '../../services/google_auth_service.dart';
+import '../../services/zalo_auth_service.dart';
 import '../../widgets/error_banner.dart';
 import '../home/admin_home.dart';
 import '../home/member_home.dart';
@@ -50,22 +53,78 @@ class _LoginScreenState extends State<LoginScreen> {
           password: _passwordController.text,
         ),
       );
-      if (!mounted) return;
+      await _finishLogin(result);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _errorMessage = e.message);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
-      await TokenStorage.saveToken(result.accessToken);
-      await TokenStorage.saveRefreshToken(result.refreshToken);
-      await TokenStorage.saveRoles(result.user.roles);
+  Future<void> _finishLogin(AuthResponse result) async {
+    await TokenStorage.saveToken(result.accessToken);
+    await TokenStorage.saveRefreshToken(result.refreshToken);
+    await TokenStorage.saveRoles(result.user.roles);
 
+    if (!mounted) return;
+    final Widget home = result.user.roles.contains('Admin')
+        ? const AdminHome()
+        : MemberHome();
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => home),
+    );
+  }
+
+  Future<void> _googleSignIn() async {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final idToken = await GoogleAuthService().getIdToken();
+      if (idToken == null) return; // người dùng hủy
+      final result = await _authService.loginWithGoogle(idToken);
       if (!mounted) return;
-      if (result.user.roles.contains('Admin')) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const AdminHome()),
-        );
-      } else {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => MemberHome()),
-        );
-      }
+      await _finishLogin(result);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _errorMessage = e.message);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _zaloSignIn() async {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final accessToken = await ZaloAuthService().getAccessToken();
+      if (accessToken == null) return; // người dùng hủy
+      final result = await _authService.loginWithZalo(accessToken);
+      if (!mounted) return;
+      await _finishLogin(result);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _errorMessage = e.message);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _facebookSignIn() async {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final accessToken = await FacebookAuthService().getAccessToken();
+      if (accessToken == null) return; // người dùng hủy
+      final result = await _authService.loginWithFacebook(accessToken);
+      if (!mounted) return;
+      await _finishLogin(result);
     } on ApiException catch (e) {
       if (mounted) setState(() => _errorMessage = e.message);
     } finally {
@@ -205,6 +264,33 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             )
                           : const Text('Đăng nhập'),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: _isLoading ? null : _googleSignIn,
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(52),
+                      ),
+                      icon: const Icon(Icons.g_mobiledata, size: 32),
+                      label: const Text('Đăng nhập với Google'),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: _isLoading ? null : _zaloSignIn,
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(52),
+                      ),
+                      icon: const Icon(Icons.chat_bubble_outline),
+                      label: const Text('Đăng nhập với Zalo'),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: _isLoading ? null : _facebookSignIn,
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(52),
+                      ),
+                      icon: const Icon(Icons.facebook),
+                      label: const Text('Đăng nhập với Facebook'),
                     ),
                     const SizedBox(height: 16),
                     Wrap(

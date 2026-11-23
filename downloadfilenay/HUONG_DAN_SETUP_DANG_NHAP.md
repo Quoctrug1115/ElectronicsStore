@@ -40,11 +40,15 @@ Google, Zalo, Facebook đã cấu hình theo chứng chỉ debug trong file `dow
 ## Bước 2. Đặt khóa bí mật Facebook cho backend
 
 Chỉ cần trên máy **chạy backend**. Chạy trong thư mục `backend/`:
+```bash
+Khởi tạo User Secrets cho dự án: Chạy lệnh sau để .NET tự động tạo một mã định danh duy nhất và gắn vào file backend.csproj:
+dotnet user-secrets init
+```
 
 ```bash
 cd backend
 dotnet user-secrets set "Facebook:AppSecret" "4198312ce6b216e16f310d2ed3604774"
-```
+```   
 
 Kiểm tra (chỉ hiện tên khóa):
 

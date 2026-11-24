@@ -86,4 +86,16 @@ public class OrderDetailDto
     public DateTime? UpdatedAt { get; set; }
     public List<OrderItemDetailDto> Items { get; set; } = new();
     public List<OrderStatusHistoryDto> StatusHistory { get; set; } = new();
+    public string? VietQrUrl { get; set; }
+    public VietQrInfoDto? VietQr { get; set; }
+}
+
+public class VietQrInfoDto
+{
+    public string BankId { get; set; } = string.Empty;
+    public string AccountNo { get; set; } = string.Empty;
+    public string AccountName { get; set; } = string.Empty;
+    public long Amount { get; set; }
+    public string AddInfo { get; set; } = string.Empty;
+    public string QrImageUrl { get; set; } = string.Empty;
 }

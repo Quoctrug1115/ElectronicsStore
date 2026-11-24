@@ -58,6 +58,10 @@ class OrderResponse {
   final String shippingAddress;
   final String? note;
   final double totalAmount;
+  final String paymentMethod;
+  final String paymentStatus;
+  final String? vietQrUrl;
+  final VietQrInfo? vietQr;
   final DateTime createdAt;
   final List<OrderItemResponse> items;
 
@@ -70,25 +74,53 @@ class OrderResponse {
     required this.shippingAddress,
     this.note,
     required this.totalAmount,
+    this.paymentMethod = 'COD',
+    this.paymentStatus = 'Pending',
+    this.vietQrUrl,
+    this.vietQr,
     required this.createdAt,
     this.items = const [],
   });
 
-  factory OrderResponse.fromJson(Map<String, dynamic> json) => OrderResponse(
-    id: (json['id'] as num).toInt(),
-    orderCode: json['orderCode'] as String? ?? '',
-    status: json['status'] as String? ?? '',
-    recipientName: json['recipientName'] as String? ?? '',
-    phoneNumber: json['phoneNumber'] as String? ?? '',
-    shippingAddress: json['shippingAddress'] as String? ?? '',
-    note: json['note'] as String?,
-    totalAmount: (json['totalAmount'] as num?)?.toDouble() ?? 0.0,
-    createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ?? DateTime.now(),
-    items: (json['items'] as List<dynamic>? ?? [])
-        .map((e) => OrderItemResponse.fromJson(e as Map<String, dynamic>))
-        .toList(),
-  );
+  factory OrderResponse.fromJson(Map<String, dynamic> json) {
+    final total = (json['totalAmount'] as num?)?.toDouble() ?? 0.0;
+    final code = json['orderCode'] as String? ?? '';
+    final method = json['paymentMethod'] as String? ?? 'COD';
+    final vietQrMap = json['vietQr'] as Map<String, dynamic>?;
+    final parsedVietQr = vietQrMap != null
+        ? VietQrInfo.fromJson(vietQrMap)
+        : null;
 
+    String? qrUrl = json['vietQrUrl'] as String? ?? parsedVietQr?.qrImageUrl;
+    if ((qrUrl == null || qrUrl.isEmpty) && method.toLowerCase() == 'vietqr') {
+      final amountInt = total.round();
+      qrUrl =
+          'https://img.vietqr.io/image/MB-0909123456-compact2.png'
+          '?amount=$amountInt&addInfo=${Uri.encodeComponent(code)}&accountName=ELECTRONICS%20STORE';
+    }
+
+    return OrderResponse(
+      id: (json['id'] as num).toInt(),
+      orderCode: code,
+      status: json['status'] as String? ?? '',
+      recipientName: json['recipientName'] as String? ?? '',
+      phoneNumber: json['phoneNumber'] as String? ?? '',
+      shippingAddress: json['shippingAddress'] as String? ?? '',
+      note: json['note'] as String?,
+      totalAmount: total,
+      paymentMethod: method,
+      paymentStatus: json['paymentStatus'] as String? ?? 'Pending',
+      vietQrUrl: qrUrl,
+      vietQr: parsedVietQr,
+      createdAt:
+          DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
+          DateTime.now(),
+      items: (json['items'] as List<dynamic>? ?? [])
+          .map((e) => OrderItemResponse.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+  // ... giữ nguyên statusDisplay và statusColor bên dưới
   String get statusDisplay {
     switch (status.toLowerCase()) {
       case 'pending':
@@ -171,7 +203,8 @@ class OrderItemResponse {
       id: (json['id'] as num).toInt(),
       productId: (json['productId'] as num?)?.toInt() ?? 0,
       productName: json['productName'] as String? ?? '',
-      variantInfo: json['variantInfo'] as String? ??
+      variantInfo:
+          json['variantInfo'] as String? ??
           (parts.isNotEmpty ? parts.join(' - ') : null),
       quantity: (json['quantity'] as num).toInt(),
       unitPrice: (json['unitPrice'] as num?)?.toDouble() ?? 0.0,
@@ -199,14 +232,40 @@ class PagedResultOrder {
   bool get hasNextPage => pageIndex < totalPages;
   bool get hasPreviousPage => pageIndex > 1;
 
-  factory PagedResultOrder.fromJson(
-    Map<String, dynamic> json,
-  ) => PagedResultOrder(
-    items: (json['items'] as List<dynamic>? ?? [])
-        .map((e) => OrderResponse.fromJson(e as Map<String, dynamic>))
-        .toList(),
-    totalCount: (json['totalCount'] as num).toInt(),
-    pageIndex: (json['pageIndex'] as num).toInt(),
-    pageSize: (json['pageSize'] as num).toInt(),
+  factory PagedResultOrder.fromJson(Map<String, dynamic> json) =>
+      PagedResultOrder(
+        items: (json['items'] as List<dynamic>? ?? [])
+            .map((e) => OrderResponse.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        totalCount: (json['totalCount'] as num).toInt(),
+        pageIndex: (json['pageIndex'] as num).toInt(),
+        pageSize: (json['pageSize'] as num).toInt(),
+      );
+}
+
+class VietQrInfo {
+  final String bankId;
+  final String accountNo;
+  final String accountName;
+  final int amount;
+  final String addInfo;
+  final String qrImageUrl;
+
+  const VietQrInfo({
+    required this.bankId,
+    required this.accountNo,
+    required this.accountName,
+    required this.amount,
+    required this.addInfo,
+    required this.qrImageUrl,
+  });
+
+  factory VietQrInfo.fromJson(Map<String, dynamic> json) => VietQrInfo(
+    bankId: json['bankId'] as String? ?? 'MB',
+    accountNo: json['accountNo'] as String? ?? '',
+    accountName: json['accountName'] as String? ?? '',
+    amount: (json['amount'] as num?)?.toInt() ?? 0,
+    addInfo: json['addInfo'] as String? ?? '',
+    qrImageUrl: json['qrImageUrl'] as String? ?? '',
   );
 }

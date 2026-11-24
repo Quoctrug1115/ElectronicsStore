@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/format.dart';
@@ -10,7 +11,7 @@ import '../home/member_home.dart';
 import 'order_history_screen.dart';
 
 class CheckoutScreen extends ConsumerStatefulWidget {
-  CheckoutScreen({super.key});
+  const CheckoutScreen({super.key});
 
   @override
   ConsumerState<CheckoutScreen> createState() => _CheckoutScreenState();
@@ -23,19 +24,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   final _addressController = TextEditingController();
   final _noteController = TextEditingController();
 
+  String _paymentMethod = 'COD';
   bool _isLoading = false;
   String? _errorMessage;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadUserInfo();
-  }
-
-  Future<void> _loadUserInfo() async {
-    // Placeholder for loading user info from backend
-    // Fields will be filled by user input
-  }
 
   @override
   void dispose() {
@@ -63,12 +54,19 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         recipientName: _nameController.text.trim(),
         phoneNumber: _phoneController.text.trim(),
         shippingAddress: _addressController.text.trim(),
-        note: _noteController.text.trim().isEmpty ? null : _noteController.text.trim(),
-        items: cart.items.map((item) => OrderItemRequest(
-          productId: item.product.id,
-          variantId: item.variant?.id,
-          quantity: item.quantity,
-        )).toList(),
+        paymentMethod: _paymentMethod,
+        note: _noteController.text.trim().isEmpty
+            ? null
+            : _noteController.text.trim(),
+        items: cart.items
+            .map(
+              (item) => OrderItemRequest(
+                productId: item.product.id,
+                variantId: item.variant?.id,
+                quantity: item.quantity,
+              ),
+            )
+            .toList(),
       );
 
       final order = await orderService.createOrder(request);
@@ -79,9 +77,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(
-          builder: (_) => OrderSuccessScreen(order: order),
-        ),
+        MaterialPageRoute(builder: (_) => OrderSuccessScreen(order: order)),
         (route) => route.isFirst,
       );
     } on Exception catch (e) {
@@ -127,16 +123,25 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             if (_errorMessage != null)
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 color: Theme.of(context).colorScheme.errorContainer,
                 child: Row(
                   children: [
-                    Icon(Icons.error_outline, color: Theme.of(context).colorScheme.onErrorContainer, size: 20),
+                    Icon(
+                      Icons.error_outline,
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                      size: 20,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         _errorMessage!,
-                        style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onErrorContainer,
+                        ),
                       ),
                     ),
                   ],
@@ -154,18 +159,22 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                       controller: _nameController,
                       label: 'Họ và tên',
                       hint: 'Nguyễn Văn A',
-                      validator: (v) => v?.trim().isEmpty == true ? 'Vui lòng nhập họ tên' : null,
+                      validator: (v) => v?.trim().isEmpty == true
+                          ? 'Vui lòng nhập họ tên'
+                          : null,
                     ),
                     const SizedBox(height: 12),
                     _buildTextField(
                       controller: _phoneController,
                       label: 'Số điện thoại',
-                      hint: '090 123 4567',
+                      hint: '0901234567',
                       keyboardType: TextInputType.phone,
                       validator: (v) {
-                        if (v?.trim().isEmpty == true) return 'Vui lòng nhập số điện thoại';
+                        if (v?.trim().isEmpty == true)
+                          return 'Vui lòng nhập số điện thoại';
                         final phone = v!.trim();
-                        if (!RegExp(r'^(0|\+84)[3|5|7|8|9]\d{8}$').hasMatch(phone)) {
+                        if (!RegExp(r'^(0|\+84)[3|5|7|8|9]\d{8}$')
+                            .hasMatch(phone)) {
                           return 'Số điện thoại không hợp lệ';
                         }
                         return null;
@@ -177,8 +186,14 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                       label: 'Địa chỉ giao hàng',
                       hint: 'Số nhà, đường, phường, quận, thành phố',
                       maxLines: 3,
-                      validator: (v) => v?.trim().isEmpty == true ? 'Vui lòng nhập địa chỉ' : null,
+                      validator: (v) => v?.trim().isEmpty == true
+                          ? 'Vui lòng nhập địa chỉ'
+                          : null,
                     ),
+                    const SizedBox(height: 24),
+                    _buildSectionTitle('Phương thức thanh toán'),
+                    const SizedBox(height: 12),
+                    _buildPaymentMethodSelector(),
                     const SizedBox(height: 24),
                     _buildSectionTitle('Ghi chú đơn hàng (tùy chọn)'),
                     const SizedBox(height: 12),
@@ -191,7 +206,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                     const SizedBox(height: 24),
                     _buildSectionTitle('Đơn hàng'),
                     const SizedBox(height: 12),
-                    ...cart.items.map((item) => _buildOrderItem(item)).toList(),
+                    ...cart.items.map((item) => _buildOrderItem(item)),
                     const SizedBox(height: 12),
                     _buildOrderSummary(cart),
                   ],
@@ -201,6 +216,50 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             _buildBottomBar(cart),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildPaymentMethodSelector() {
+    final theme = Theme.of(context);
+    return Card(
+      child: Column(
+        children: [
+          RadioListTile<String>(
+            value: 'COD',
+            groupValue: _paymentMethod,
+            onChanged: _isLoading
+                ? null
+                : (val) => setState(() => _paymentMethod = val!),
+            secondary: Icon(
+              Icons.local_shipping_outlined,
+              color: theme.colorScheme.primary,
+            ),
+            title: const Text(
+              'Thanh toán khi nhận hàng (COD)',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: const Text(
+              'Thanh toán tiền mặt cho shipper khi nhận hàng',
+            ),
+          ),
+          const Divider(height: 1),
+          RadioListTile<String>(
+            value: 'VietQR',
+            groupValue: _paymentMethod,
+            onChanged: _isLoading
+                ? null
+                : (val) => setState(() => _paymentMethod = val!),
+            secondary: Icon(Icons.qr_code_2, color: theme.colorScheme.primary),
+            title: const Text(
+              'Chuyển khoản ngân hàng (VietQR)',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: const Text(
+              'Quét mã QR động tự động điền số tiền & mã đơn hàng',
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -265,7 +324,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                     item.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   if (item.variantInfo.isNotEmpty)
                     Text(
@@ -316,7 +377,12 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     );
   }
 
-  Widget _buildSummaryRow(String label, String value, {bool isTotal = false, bool isHighlighted = false}) {
+  Widget _buildSummaryRow(
+    String label,
+    String value, {
+    bool isTotal = false,
+    bool isHighlighted = false,
+  }) {
     final theme = Theme.of(context);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -324,9 +390,13 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         Text(
           label,
           style: isTotal
-              ? theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)
+              ? theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                )
               : theme.textTheme.bodyMedium?.copyWith(
-                  color: isHighlighted ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+                  color: isHighlighted
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurfaceVariant,
                 ),
         ),
         Text(
@@ -351,7 +421,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant)),
+        border: Border(
+          top: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
@@ -375,7 +447,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 )
               : Text(
                   'Đặt hàng - ${formatVnd(cart.totalPrice)}',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
         ),
       ),
@@ -390,65 +465,260 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   }
 }
 
-class OrderSuccessScreen extends StatelessWidget {
+class OrderSuccessScreen extends StatefulWidget {
   final OrderResponse order;
 
   const OrderSuccessScreen({super.key, required this.order});
 
   @override
+  State<OrderSuccessScreen> createState() => _OrderSuccessScreenState();
+}
+
+class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
+  bool _isConfirming = false;
+  bool _confirmedTransfer = false;
+
+  Future<void> _confirmTransferred() async {
+    setState(() => _isConfirming = true);
+    try {
+      final msg = await OrderService().confirmVietQrPayment(widget.order.id);
+      if (!mounted) return;
+      setState(() {
+        _confirmedTransfer = true;
+        _isConfirming = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    } on Exception catch (e) {
+      if (!mounted) return;
+      setState(() => _isConfirming = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
+  void _copyText(String label, String text) {
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('Đã sao chép $label: $text')));
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final order = widget.order;
+    final isVietQr =
+        order.paymentMethod.toLowerCase() == 'vietqr' &&
+        order.vietQrUrl != null &&
+        order.vietQrUrl!.isNotEmpty;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Đặt hàng thành công'), automaticallyImplyLeading: false),
+      appBar: AppBar(
+        title: Text(isVietQr ? 'Thanh toán VietQR' : 'Đặt hàng thành công'),
+        automaticallyImplyLeading: false,
+      ),
       body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.check_circle_outline, size: 96, color: theme.colorScheme.primary),
-              const SizedBox(height: 24),
-              Text(
-                'Đặt hàng thành công!',
-                style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Mã đơn hàng: ${order.orderCode}',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isVietQr ? Icons.qr_code_scanner : Icons.check_circle_outline,
+                  size: isVietQr ? 64 : 96,
+                  color: theme.colorScheme.primary,
                 ),
-              ),
-              const SizedBox(height: 32),
-              FilledButton.icon(
-                onPressed: () {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (_) => OrderHistoryScreen()),
-                    (route) => route.isFirst,
-                  );
-                },
-                icon: const Icon(Icons.receipt_long),
-                label: const Text('Xem lịch sử đơn hàng'),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                const SizedBox(height: 16),
+                Text(
+                  isVietQr
+                      ? 'Quét mã VietQR để thanh toán'
+                      : 'Đặt hàng thành công!',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextButton(
-                onPressed: () {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (_) => MemberHome()),
-                    (route) => route.isFirst,
-                  );
-                },
-                child: const Text('Tiếp tục mua sắm'),
-              ),
-            ],
+                const SizedBox(height: 8),
+                Text(
+                  'Mã đơn hàng: ${order.orderCode}',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                if (isVietQr) ...[
+                  const SizedBox(height: 20),
+                  Card(
+                    elevation: 2,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.network(
+                              order.vietQrUrl!,
+                              width: 260,
+                              height: 300,
+                              fit: BoxFit.contain,
+                              loadingBuilder: (context, child, progress) {
+                                if (progress == null) return child;
+                                return const SizedBox(
+                                  width: 260,
+                                  height: 260,
+                                  child: Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                );
+                              },
+                              errorBuilder: (_, _, _) => const SizedBox(
+                                height: 140,
+                                child: Center(
+                                  child: Text(
+                                    'Không tải được ảnh QR. Vui lòng chuyển khoản thủ công bên dưới.',
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const Divider(height: 24),
+                          _buildTransferRow(
+                            'Ngân hàng',
+                            order.vietQr?.bankId ?? 'MB',
+                          ),
+                          _buildTransferRow(
+                            'Số tài khoản',
+                            order.vietQr?.accountNo ?? '0909123456',
+                            onCopy: () => _copyText(
+                              'Số tài khoản',
+                              order.vietQr?.accountNo ?? '0909123456',
+                            ),
+                          ),
+                          _buildTransferRow(
+                            'Chủ tài khoản',
+                            order.vietQr?.accountName ?? 'ELECTRONICS STORE',
+                          ),
+                          _buildTransferRow(
+                            'Số tiền',
+                            formatVnd(order.totalAmount),
+                            isHighlight: true,
+                          ),
+                          _buildTransferRow(
+                            'Nội dung CK',
+                            order.orderCode,
+                            isHighlight: true,
+                            onCopy: () => _copyText(
+                              'Nội dung chuyển khoản',
+                              order.orderCode,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed: (_isConfirming || _confirmedTransfer)
+                        ? null
+                        : _confirmTransferred,
+                    icon: Icon(
+                      _confirmedTransfer
+                          ? Icons.check
+                          : Icons.verified_outlined,
+                    ),
+                    label: Text(
+                      _confirmedTransfer
+                          ? 'Đã gửi xác nhận chuyển khoản'
+                          : 'Tôi đã chuyển khoản',
+                    ),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 50),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                FilledButton.tonalIcon(
+                  onPressed: () {
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (_) => OrderHistoryScreen()),
+                      (route) => route.isFirst,
+                    );
+                  },
+                  icon: const Icon(Icons.receipt_long),
+                  label: const Text('Xem lịch sử đơn hàng'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (_) => MemberHome()),
+                      (route) => route.isFirst,
+                    );
+                  },
+                  child: const Text('Tiếp tục mua sắm'),
+                ),
+              ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildTransferRow(
+    String label,
+    String value, {
+    bool isHighlight = false,
+    VoidCallback? onCopy,
+  }) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(
+              label,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Flexible(
+                  child: Text(
+                    value,
+                    textAlign: TextAlign.right,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: isHighlight
+                          ? FontWeight.w700
+                          : FontWeight.w600,
+                      color: isHighlight ? theme.colorScheme.primary : null,
+                    ),
+                  ),
+                ),
+                if (onCopy != null)
+                  IconButton(
+                    icon: const Icon(Icons.copy, size: 18),
+                    tooltip: 'Sao chép',
+                    onPressed: onCopy,
+                    visualDensity: VisualDensity.compact,
+                  ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

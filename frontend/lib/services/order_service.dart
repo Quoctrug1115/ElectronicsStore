@@ -16,10 +16,7 @@ class OrderService {
 
     // 1. Làm sạch giỏ hàng tạm trên server (nếu có) để tránh trùng số lượng
     await _client
-        .delete(
-          Uri.parse('${ApiConfig.baseUrl}/api/cart'),
-          headers: headers,
-        )
+        .delete(Uri.parse('${ApiConfig.baseUrl}/api/cart'), headers: headers)
         .timeout(ApiConfig.timeout);
 
     // 2. Đồng bộ từng sản phẩm từ giỏ hàng Flutter lên bảng CartItems của Backend
@@ -66,6 +63,7 @@ class OrderService {
     }
     throw _toApiException(status, data);
   }
+
   Future<PagedResultOrder> getOrders({
     int pageIndex = 1,
     int pageSize = 10,
@@ -119,6 +117,27 @@ class OrderService {
     final data = _decodeBody(response);
     final status = response.statusCode;
     if (status >= 200 && status < 300) return;
+    throw _toApiException(status, data);
+  }
+
+  Future<String> confirmVietQrPayment(int id) async {
+    final response = await _client
+        .post(
+          Uri.parse(
+            '${ApiConfig.baseUrl}${ApiConfig.orders}/$id/confirm-payment',
+          ),
+          headers: await _authHeaders(),
+        )
+        .timeout(ApiConfig.timeout);
+
+    final data = _decodeBody(response);
+    final status = response.statusCode;
+    if (status >= 200 && status < 300) {
+      if (data is Map && data['message'] is String) {
+        return data['message'] as String;
+      }
+      return 'Đã ghi nhận thông tin chuyển khoản.';
+    }
     throw _toApiException(status, data);
   }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/format.dart';
@@ -8,7 +9,7 @@ import '../../services/order_service.dart';
 class OrderDetailScreen extends ConsumerStatefulWidget {
   final int orderId;
 
-  OrderDetailScreen({super.key, required this.orderId});
+  const OrderDetailScreen({super.key, required this.orderId});
 
   @override
   ConsumerState<OrderDetailScreen> createState() => _OrderDetailScreenState();
@@ -19,6 +20,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
 
   OrderResponse? _order;
   bool _isLoading = true;
+  bool _isConfirmingPayment = false;
   String? _errorMessage;
 
   @override
@@ -48,12 +50,31 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
     }
   }
 
+  Future<void> _confirmVietQrPayment() async {
+    setState(() => _isConfirmingPayment = true);
+    try {
+      final msg = await _orderService.confirmVietQrPayment(widget.orderId);
+      if (!mounted) return;
+      setState(() => _isConfirmingPayment = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      await _loadOrder();
+    } on Exception catch (e) {
+      if (!mounted) return;
+      setState(() => _isConfirmingPayment = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
   Future<void> _cancelOrder() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Hủy đơn hàng?'),
-        content: const Text('Bạn có chắc chắn muốn hủy đơn hàng này? Hành động này không thể hoàn tác.'),
+        content: const Text(
+          'Bạn có chắc chắn muốn hủy đơn hàng này? Hành động này không thể hoàn tác.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -77,6 +98,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
       await _orderService.cancelOrder(widget.orderId);
       if (!mounted) return;
       await _loadOrder();
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Đã hủy đơn hàng thành công')),
       );
@@ -89,21 +111,23 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
     }
   }
 
+  void _copyText(String label, String text) {
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('Đã sao chép $label: $text')));
+  }
+
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       appBar: AppBar(title: const Text('Chi tiết đơn hàng')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
-              ? _buildError()
-              : _order == null
-                  ? const Center(child: Text('Không tìm thấy đơn hàng'))
-                  : RefreshIndicator(
-                      onRefresh: _loadOrder,
-                      child: _buildOrderDetail(),
-                    ),
+          ? _buildError()
+          : _order == null
+          ? const Center(child: Text('Không tìm thấy đơn hàng'))
+          : RefreshIndicator(onRefresh: _loadOrder, child: _buildOrderDetail()),
     );
   }
 
@@ -129,29 +153,76 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
 
   Widget _buildOrderDetail() {
     final order = _order!;
+    final showVietQr =
+        order.paymentMethod.toLowerCase() == 'vietqr' &&
+        order.paymentStatus.toLowerCase() != 'completed' &&
+        order.status.toLowerCase() != 'cancelled' &&
+        order.status.toLowerCase() != 'returned' &&
+        order.vietQrUrl != null &&
+        order.vietQrUrl!.isNotEmpty;
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         _buildStatusCard(order),
+        if (showVietQr) ...[
+          const SizedBox(height: 16),
+          _buildVietQrCard(order),
+        ],
         const SizedBox(height: 16),
         _buildInfoSection('Thông tin người nhận', [
-          _InfoRow(label: 'Họ tên', value: order.recipientName, icon: Icons.person_outline),
-          _InfoRow(label: 'Số điện thoại', value: order.phoneNumber, icon: Icons.phone_outlined),
-          _InfoRow(label: 'Địa chỉ giao hàng', value: order.shippingAddress, icon: Icons.location_on_outlined),
+          _InfoRow(
+            label: 'Họ tên',
+            value: order.recipientName,
+            icon: Icons.person_outline,
+          ),
+          _InfoRow(
+            label: 'Số điện thoại',
+            value: order.phoneNumber,
+            icon: Icons.phone_outlined,
+          ),
+          _InfoRow(
+            label: 'Địa chỉ giao hàng',
+            value: order.shippingAddress,
+            icon: Icons.location_on_outlined,
+          ),
           if (order.note != null && order.note!.isNotEmpty)
-            _InfoRow(label: 'Ghi chú', value: order.note!, icon: Icons.note_outlined),
+            _InfoRow(
+              label: 'Ghi chú',
+              value: order.note!,
+              icon: Icons.note_outlined,
+            ),
         ]),
         const SizedBox(height: 16),
         _buildInfoSection('Thông tin đơn hàng', [
-          _InfoRow(label: 'Mã đơn hàng', value: order.orderCode, icon: Icons.receipt_long),
+          _InfoRow(
+            label: 'Mã đơn hàng',
+            value: order.orderCode,
+            icon: Icons.receipt_long,
+          ),
           _InfoRow(
             label: 'Ngày đặt',
             value: formatDateTime(order.createdAt),
             icon: Icons.calendar_today_outlined,
           ),
           _InfoRow(
-            label: 'Trạng thái',
+            label: 'Phương thức thanh toán',
+            value: _paymentMethodLabel(order.paymentMethod),
+            icon: Icons.payments_outlined,
+          ),
+          _InfoRow(
+            label: 'Trạng thái thanh toán',
+            value: _paymentStatusLabel(order.paymentStatus),
+            icon: Icons.account_balance_wallet_outlined,
+            valueStyle: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: order.paymentStatus.toLowerCase() == 'completed'
+                  ? Colors.green
+                  : Colors.orange.shade800,
+            ),
+          ),
+          _InfoRow(
+            label: 'Trạng thái đơn hàng',
             value: order.statusDisplay,
             icon: Icons.info_outline,
             valueStyle: TextStyle(
@@ -164,10 +235,183 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
         _buildItemsSection(order),
         const SizedBox(height: 16),
         _buildPriceSummary(order),
-        if (order.status.toLowerCase() == 'pending' || order.status.toLowerCase() == 'confirmed')
+        if (order.status.toLowerCase() == 'pending' ||
+            order.status.toLowerCase() == 'confirmed')
           _buildCancelButton(),
       ],
     );
+  }
+
+  Widget _buildVietQrCard(OrderResponse order) {
+    final theme = Theme.of(context);
+    final bankId = order.vietQr?.bankId ?? 'MB';
+    final accountNo = order.vietQr?.accountNo ?? '0909123456';
+    final accountName = order.vietQr?.accountName ?? 'ELECTRONICS STORE';
+
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.qr_code_2, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Thanh toán chuyển khoản VietQR',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(
+                order.vietQrUrl!,
+                width: 240,
+                height: 280,
+                fit: BoxFit.contain,
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return const SizedBox(
+                    width: 240,
+                    height: 240,
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                },
+                errorBuilder: (_, _, _) => const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Text(
+                    'Không tải được ảnh QR. Vui lòng chuyển khoản theo thông tin bên dưới.',
+                  ),
+                ),
+              ),
+            ),
+            const Divider(height: 24),
+            _buildTransferRow('Ngân hàng', bankId),
+            _buildTransferRow(
+              'Số tài khoản',
+              accountNo,
+              onCopy: () => _copyText('Số tài khoản', accountNo),
+            ),
+            _buildTransferRow('Chủ tài khoản', accountName),
+            _buildTransferRow(
+              'Số tiền',
+              formatVnd(order.totalAmount),
+              isHighlight: true,
+            ),
+            _buildTransferRow(
+              'Nội dung CK',
+              order.orderCode,
+              isHighlight: true,
+              onCopy: () => _copyText('Nội dung chuyển khoản', order.orderCode),
+            ),
+            const SizedBox(height: 14),
+            FilledButton.icon(
+              onPressed: _isConfirmingPayment ? null : _confirmVietQrPayment,
+              icon: _isConfirmingPayment
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.verified_outlined),
+              label: const Text('Tôi đã chuyển khoản'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(double.infinity, 46),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTransferRow(
+    String label,
+    String value, {
+    bool isHighlight = false,
+    VoidCallback? onCopy,
+  }) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(
+              label,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Flexible(
+                  child: Text(
+                    value,
+                    textAlign: TextAlign.right,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: isHighlight
+                          ? FontWeight.w700
+                          : FontWeight.w600,
+                      color: isHighlight ? theme.colorScheme.primary : null,
+                    ),
+                  ),
+                ),
+                if (onCopy != null)
+                  IconButton(
+                    icon: const Icon(Icons.copy, size: 18),
+                    tooltip: 'Sao chép',
+                    onPressed: onCopy,
+                    visualDensity: VisualDensity.compact,
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _paymentMethodLabel(String method) {
+    switch (method.toLowerCase()) {
+      case 'vietqr':
+        return 'Chuyển khoản ngân hàng (VietQR)';
+      case 'cod':
+        return 'Thanh toán khi nhận hàng (COD)';
+      case 'banktransfer':
+        return 'Chuyển khoản ngân hàng';
+      default:
+        return method;
+    }
+  }
+
+  String _paymentStatusLabel(String status) {
+    switch (status.toLowerCase()) {
+      case 'completed':
+        return 'Đã thanh toán';
+      case 'pending':
+        return 'Chờ thanh toán';
+      case 'failed':
+        return 'Đã hủy / Thất bại';
+      case 'refunded':
+        return 'Đã hoàn tiền';
+      default:
+        return status;
+    }
   }
 
   Widget _buildStatusCard(OrderResponse order) {
@@ -233,12 +477,16 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
       ('delivered', 'Đã giao'),
     ];
 
-    final currentIndex = statuses.indexWhere((s) => s.$1 == order.status.toLowerCase());
+    final normalizedStatus = order.status.toLowerCase() == 'shipped'
+        ? 'shipping'
+        : order.status.toLowerCase();
+    final currentIndex = statuses.indexWhere((s) => s.$1 == normalizedStatus);
 
     return Column(
       children: List.generate(statuses.length, (index) {
         final isCompleted = index <= currentIndex;
-        final isCurrent = index == currentIndex && order.status.toLowerCase() != 'cancelled';
+        final isCurrent =
+            index == currentIndex && order.status.toLowerCase() != 'cancelled';
         final isLast = index == statuses.length - 1;
 
         return Row(
@@ -255,7 +503,9 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                         ? order.statusColor
                         : theme.colorScheme.outlineVariant,
                     border: Border.all(
-                      color: isCompleted ? order.statusColor : theme.colorScheme.outline,
+                      color: isCompleted
+                          ? order.statusColor
+                          : theme.colorScheme.outline,
                       width: 2,
                     ),
                   ),
@@ -283,7 +533,9 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                     Text(
                       statuses[index].$2,
                       style: TextStyle(
-                        fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
+                        fontWeight: isCurrent
+                            ? FontWeight.w700
+                            : FontWeight.w500,
                         color: isCompleted
                             ? theme.colorScheme.onSurface
                             : theme.colorScheme.onSurfaceVariant,
@@ -316,6 +568,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
         return Icons.verified;
       case 'processing':
         return Icons.settings;
+      case 'shipped':
       case 'shipping':
         return Icons.local_shipping_outlined;
       case 'delivered':
@@ -335,35 +588,46 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 12),
-            ...rows.map((row) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(row.icon, size: 20, color: theme.colorScheme.onSurfaceVariant),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          row.label,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        Text(
-                          row.value,
-                          style: row.valueStyle ?? theme.textTheme.bodyMedium,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
               ),
-            )),
+            ),
+            const SizedBox(height: 12),
+            ...rows.map(
+              (row) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      row.icon,
+                      size: 20,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            row.label,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          Text(
+                            row.value,
+                            style: row.valueStyle ?? theme.textTheme.bodyMedium,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -378,10 +642,14 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Sản phẩm (${order.items.length})',
-                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+            Text(
+              'Sản phẩm (${order.items.length})',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             const SizedBox(height: 12),
-            ...order.items.map((item) => _buildOrderItem(item)).toList(),
+            ...order.items.map((item) => _buildOrderItem(item)),
           ],
         ),
       ),
@@ -417,7 +685,9 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                   item.productName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 if (item.variantInfo != null && item.variantInfo!.isNotEmpty)
                   Text(
@@ -540,7 +810,9 @@ class _PriceRow extends StatelessWidget {
         Text(
           label,
           style: isTotal
-              ? theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)
+              ? theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                )
               : theme.textTheme.bodyMedium,
         ),
         Text(
@@ -550,7 +822,10 @@ class _PriceRow extends StatelessWidget {
                   fontWeight: FontWeight.w800,
                   color: theme.colorScheme.primary,
                 )
-              : valueStyle ?? theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+              : valueStyle ??
+                    theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
         ),
       ],
     );

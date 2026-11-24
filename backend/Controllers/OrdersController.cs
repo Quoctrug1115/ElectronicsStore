@@ -14,23 +14,23 @@ namespace backend.Controllers;
 public class OrdersController : ControllerBase
 {
     private readonly ElectronicsStoreContext _context;
+    private readonly IConfiguration _configuration;
 
     private static readonly HashSet<string> AllowedPaymentMethods = new(StringComparer.OrdinalIgnoreCase)
     {
         "COD", "BankTransfer", "VNPay", "VietQR", "MoMo", "ZaloPay"
     };
 
-    public OrdersController(ElectronicsStoreContext context)
+    public OrdersController(ElectronicsStoreContext context, IConfiguration configuration)
     {
         _context = context;
+        _configuration = configuration;
     }
-    
+
     // 1. CHECKOUT: TẠO ĐƠN HÀNG TỪ GIỎ HÀNG BẰNG TRANSACTION
     [HttpPost("checkout")]
     public async Task<IActionResult> Checkout([FromBody] CheckoutRequest request)
     {
-        // Nhiều người cùng đặt có thể gây deadlock hiếm gặp (SQL Server chọn 1 giao dịch làm nạn nhân,
-        // đã tự rollback) -> thử lại tối đa 3 lần với giỏ hàng/tồn kho đọc lại từ đầu.
         for (var attempt = 1; attempt <= 3; attempt++)
         {
             try
@@ -60,7 +60,6 @@ public class OrdersController : ControllerBase
             });
         }
 
-        // Lấy giỏ hàng hiện tại của user
         var cart = await _context.Carts
             .Include(c => c.Items)
                 .ThenInclude(i => i.Variant)
@@ -70,7 +69,6 @@ public class OrdersController : ControllerBase
         if (cart == null || cart.Items.Count == 0)
             return BadRequest(new { message = "Giỏ hàng đang trống, không thể đặt hàng." });
 
-        // Kiểm tra tất cả sản phẩm trong giỏ còn đang kinh doanh
         foreach (var item in cart.Items)
         {
             if (item.Variant.Product.IsDeleted || !item.Variant.Product.IsActive || !item.Variant.IsActive)
@@ -82,7 +80,6 @@ public class OrdersController : ControllerBase
             }
         }
 
-        // Chuẩn hóa tên phương thức thanh toán đúng chữ hoa/thường theo CHECK constraint DB
         var normalizedPaymentMethod = AllowedPaymentMethods.First(m =>
             m.Equals(request.PaymentMethod, StringComparison.OrdinalIgnoreCase));
 
@@ -95,10 +92,11 @@ public class OrdersController : ControllerBase
             var shippingFee = request.ShippingFee;
             var totalAmount = subtotal - discountAmount + shippingFee;
 
-            // Trừ tồn kho nguyên tử: chỉ trừ khi còn đủ hàng (WHERE StockQuantity >= qty).
-            // Hai người mua cùng lúc không thể làm tồn kho âm; thiếu hàng thì rollback toàn bộ đơn.
-            // Luôn trừ theo thứ tự VariantId tăng dần để các giao dịch khóa dòng cùng thứ tự (tránh deadlock).
-            foreach (var item in cart.Items.GroupBy(i => i.VariantId).Select(g => new { VariantId = g.Key, Qty = g.Sum(x => x.Quantity) }).OrderBy(x => x.VariantId))
+            // Trừ tồn kho nguyên tử theo thứ tự VariantId tăng dần
+            foreach (var item in cart.Items
+                .GroupBy(i => i.VariantId)
+                .Select(g => new { VariantId = g.Key, Qty = g.Sum(x => x.Quantity) })
+                .OrderBy(x => x.VariantId))
             {
                 var affected = await _context.Database.ExecuteSqlInterpolatedAsync(
                     $"UPDATE ProductVariants SET StockQuantity = StockQuantity - {item.Qty} WHERE Id = {item.VariantId} AND StockQuantity >= {item.Qty}");
@@ -108,7 +106,10 @@ public class OrdersController : ControllerBase
                     await transaction.RollbackAsync();
                     var v = cart.Items.First(i => i.VariantId == item.VariantId).Variant;
                     var left = await _context.ProductVariants.AsNoTracking()
-                        .Where(x => x.Id == item.VariantId).Select(x => x.StockQuantity).FirstOrDefaultAsync();
+                        .Where(x => x.Id == item.VariantId)
+                        .Select(x => x.StockQuantity)
+                        .FirstOrDefaultAsync();
+
                     return BadRequest(new
                     {
                         message = left <= 0
@@ -120,7 +121,6 @@ public class OrdersController : ControllerBase
 
             var orderCode = $"ORD-{now:yyyyMMddHHmmss}-{Random.Shared.Next(1000, 9999)}";
 
-            // Bước A: Tạo Order
             var order = new Order
             {
                 OrderCode = orderCode,
@@ -141,7 +141,6 @@ public class OrdersController : ControllerBase
             _context.Orders.Add(order);
             await _context.SaveChangesAsync();
 
-            // Bước B: Copy các sản phẩm từ CartItems sang OrderItems (OrderDetails)
             var orderItems = cart.Items.Select(ci => new OrderItem
             {
                 OrderId = order.Id,
@@ -155,7 +154,6 @@ public class OrdersController : ControllerBase
 
             _context.OrderItems.AddRange(orderItems);
 
-            // Bước C: Ghi nhận thông tin thanh toán & lịch sử trạng thái khởi tạo
             _context.Payments.Add(new Payment
             {
                 OrderId = order.Id,
@@ -171,11 +169,10 @@ public class OrdersController : ControllerBase
                 OldStatus = null,
                 NewStatus = "Pending",
                 ChangedBy = userId,
-                Note = "Khách hàng đặt đơn hàng mới",
+                Note = $"Khách hàng đặt đơn hàng mới ({normalizedPaymentMethod})",
                 CreatedAt = now
             });
 
-            // Bước D: Xóa toàn bộ CartItems sau khi đã chuyển sang đơn hàng
             _context.CartItems.RemoveRange(cart.Items);
             cart.UpdatedAt = now;
 
@@ -196,7 +193,7 @@ public class OrdersController : ControllerBase
         }
     }
 
-// 2. XEM DANH SÁCH ĐƠN HÀNG CỦA USER (PHÂN TRANG, TÌM KIẾM & LỌC NGÀY/TRẠNG THÁI)
+    // 2. XEM DANH SÁCH ĐƠN HÀNG CỦA USER (PHÂN TRANG, TÌM KIẾM & LỌC NGÀY/TRẠNG THÁI)
     [HttpGet]
     public async Task<IActionResult> GetMyOrders(
         [FromQuery] int? page = null,
@@ -225,7 +222,6 @@ public class OrdersController : ControllerBase
             .Where(o => o.UserId == userId)
             .AsQueryable();
 
-        // Lọc theo trạng thái (chuẩn hóa cả 'shipping' từ Flutter thành 'Shipped' trong DB)
         if (!string.IsNullOrWhiteSpace(status))
         {
             var normalizedStatus = status.Trim().ToLowerInvariant() switch
@@ -242,7 +238,6 @@ public class OrdersController : ControllerBase
             query = query.Where(o => o.Status == normalizedStatus);
         }
 
-        // Tìm kiếm theo mã đơn, tên/SĐT người nhận hoặc tên/SKU sản phẩm trong đơn
         if (!string.IsNullOrWhiteSpace(keyword))
         {
             var pattern = $"%{keyword.Trim()}%";
@@ -255,14 +250,12 @@ public class OrdersController : ControllerBase
                     EF.Functions.Like(oi.SKU, pattern)));
         }
 
-        // Lọc từ ngày (00:00:00)
         if (fromDate.HasValue)
         {
             var fromUtc = fromDate.Value.Date;
             query = query.Where(o => o.CreatedAt >= fromUtc);
         }
 
-        // Lọc đến hết ngày (23:59:59.999)
         if (toDate.HasValue)
         {
             var toExclusive = toDate.Value.Date.AddDays(1);
@@ -304,8 +297,8 @@ public class OrdersController : ControllerBase
 
         return Ok(result);
     }
-    
-    // 3. XEM CHI TIẾT ĐƠN HÀNG CỦA USER THEO ID
+
+    // 3. XEM CHI TIẾT ĐƠN HÀNG CỦA USER THEO ID (KÈM MÃ VIETQR NẾU THANH TOÁN VIETQR)
     [HttpGet("{id:long}")]
     public async Task<IActionResult> GetOrderById(long id)
     {
@@ -326,6 +319,121 @@ public class OrdersController : ControllerBase
 
         var detailDto = await BuildOrderDetailDtoAsync(id);
         return Ok(detailDto);
+    }
+
+    // 4. KHÁCH HÀNG HỦY ĐƠN HÀNG (KHI ĐƠN Ở TRẠNG THÁI PENDING / CONFIRMED)
+    [HttpPost("{id:long}/cancel")]
+    public async Task<IActionResult> CancelOrder(long id)
+    {
+        if (!TryGetCurrentUserId(out var userId))
+            return Unauthorized();
+
+        var order = await _context.Orders
+            .Include(o => o.OrderItems)
+            .Include(o => o.Payments)
+            .FirstOrDefaultAsync(o => o.Id == id);
+
+        if (order == null)
+            return NotFound(new { message = "Không tìm thấy đơn hàng." });
+
+        if (order.UserId != userId && !User.IsInRole("Admin"))
+            return Forbid();
+
+        if (order.Status != "Pending" && order.Status != "Confirmed")
+            return BadRequest(new { message = "Chỉ có thể hủy đơn hàng đang ở trạng thái Chờ xác nhận hoặc Đã xác nhận." });
+
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            var now = DateTime.UtcNow;
+            var oldStatus = order.Status;
+
+            // Hoàn lại tồn kho
+            foreach (var item in order.OrderItems.OrderBy(i => i.VariantId))
+            {
+                await _context.Database.ExecuteSqlInterpolatedAsync(
+                    $"UPDATE ProductVariants SET StockQuantity = StockQuantity + {item.Quantity} WHERE Id = {item.VariantId}");
+            }
+
+            order.Status = "Cancelled";
+            order.UpdatedAt = now;
+
+            var latestPayment = order.Payments.OrderByDescending(p => p.CreatedAt).FirstOrDefault();
+            if (latestPayment != null && latestPayment.Status == "Pending")
+            {
+                latestPayment.Status = "Failed";
+            }
+
+            _context.OrderStatusHistories.Add(new OrderStatusHistory
+            {
+                OrderId = order.Id,
+                OldStatus = oldStatus,
+                NewStatus = "Cancelled",
+                ChangedBy = userId,
+                Note = "Khách hàng hủy đơn hàng",
+                CreatedAt = now
+            });
+
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            return Ok(new { message = "Đã hủy đơn hàng thành công." });
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+    }
+
+    // 5. KHÁCH HÀNG XÁC NHẬN ĐÃ CHUYỂN KHOẢN VIETQR
+    [HttpPost("{id:long}/confirm-payment")]
+    public async Task<IActionResult> ConfirmVietQrPayment(long id)
+    {
+        if (!TryGetCurrentUserId(out var userId))
+            return Unauthorized();
+
+        var order = await _context.Orders
+            .Include(o => o.Payments)
+            .FirstOrDefaultAsync(o => o.Id == id);
+
+        if (order == null)
+            return NotFound(new { message = "Không tìm thấy đơn hàng." });
+
+        if (order.UserId != userId)
+            return Forbid();
+
+        if (order.Status == "Cancelled" || order.Status == "Returned")
+            return BadRequest(new { message = "Đơn hàng đã hủy, không thể xác nhận thanh toán." });
+
+        var payment = order.Payments.OrderByDescending(p => p.CreatedAt).FirstOrDefault();
+        if (payment == null || !payment.PaymentMethod.Equals("VietQR", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { message = "Đơn hàng này không sử dụng phương thức thanh toán VietQR." });
+
+        if (payment.Status == "Completed")
+            return Ok(new { message = "Thanh toán đã được xác nhận trước đó." });
+
+        var now = DateTime.UtcNow;
+        payment.TransactionCode = $"VQR-{order.OrderCode}";
+        payment.GatewayResponse = "Khách hàng xác nhận đã chuyển khoản qua VietQR";
+        order.UpdatedAt = now;
+
+        _context.OrderStatusHistories.Add(new OrderStatusHistory
+        {
+            OrderId = order.Id,
+            OldStatus = order.Status,
+            NewStatus = order.Status,
+            ChangedBy = userId,
+            Note = $"Khách hàng báo đã chuyển khoản VietQR (Nội dung: {order.OrderCode})",
+            CreatedAt = now
+        });
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new
+        {
+            message = "Đã ghi nhận thông tin chuyển khoản. Cửa hàng sẽ xác nhận đơn hàng của bạn trong giây lát."
+        });
     }
 
     // --- HÀM HỖ TRỢ ---
@@ -350,6 +458,31 @@ public class OrdersController : ControllerBase
         if (order == null) return null;
 
         var latestPayment = order.Payments.OrderByDescending(p => p.CreatedAt).FirstOrDefault();
+        var paymentMethod = latestPayment?.PaymentMethod ?? "COD";
+
+        VietQrInfoDto? vietQr = null;
+        if (paymentMethod.Equals("VietQR", StringComparison.OrdinalIgnoreCase))
+        {
+            var bankId = _configuration["VietQR:BankId"] ?? "MB";
+            var accountNo = _configuration["VietQR:AccountNo"] ?? "0909123456";
+            var accountName = _configuration["VietQR:AccountName"] ?? "ELECTRONICS STORE";
+            var template = _configuration["VietQR:Template"] ?? "compact2";
+            var amount = (long)Math.Round(order.TotalAmount, MidpointRounding.AwayFromZero);
+            var addInfo = order.OrderCode;
+
+            var qrUrl = $"https://img.vietqr.io/image/{Uri.EscapeDataString(bankId)}-{Uri.EscapeDataString(accountNo)}-{Uri.EscapeDataString(template)}.png"
+                      + $"?amount={amount}&addInfo={Uri.EscapeDataString(addInfo)}&accountName={Uri.EscapeDataString(accountName)}";
+
+            vietQr = new VietQrInfoDto
+            {
+                BankId = bankId,
+                AccountNo = accountNo,
+                AccountName = accountName,
+                Amount = amount,
+                AddInfo = addInfo,
+                QrImageUrl = qrUrl
+            };
+        }
 
         return new OrderDetailDto
         {
@@ -365,8 +498,10 @@ public class OrdersController : ControllerBase
             TotalAmount = order.TotalAmount,
             Status = order.Status,
             Note = order.Note,
-            PaymentMethod = latestPayment?.PaymentMethod ?? "COD",
+            PaymentMethod = paymentMethod,
             PaymentStatus = latestPayment?.Status ?? "Pending",
+            VietQrUrl = vietQr?.QrImageUrl,
+            VietQr = vietQr,
             CreatedAt = order.CreatedAt,
             UpdatedAt = order.UpdatedAt,
             Items = order.OrderItems
@@ -403,58 +538,5 @@ public class OrdersController : ControllerBase
                     CreatedAt = h.CreatedAt
                 }).ToList()
         };
-    }
-    // 4. MEMBER HỦY ĐƠN HÀNG CỦA CHÍNH MÌNH (Chỉ khi Pending hoặc Confirmed)
-    [HttpPost("{id:long}/cancel")]
-    public async Task<IActionResult> CancelMyOrder(long id)
-    {
-        if (!TryGetCurrentUserId(out var userId))
-            return Unauthorized();
-
-        var order = await _context.Orders
-            .Include(o => o.OrderItems)
-            .FirstOrDefaultAsync(o => o.Id == id && o.UserId == userId);
-
-        if (order == null)
-            return NotFound(new { message = "Không tìm thấy đơn hàng." });
-
-        if (order.Status != "Pending" && order.Status != "Confirmed")
-            return BadRequest(new { message = "Chỉ có thể hủy đơn hàng khi đang chờ xác nhận hoặc đã xác nhận." });
-
-        await using var transaction = await _context.Database.BeginTransactionAsync();
-        try
-        {
-            var now = DateTime.UtcNow;
-            var oldStatus = order.Status;
-
-            foreach (var item in order.OrderItems)
-            {
-                await _context.Database.ExecuteSqlInterpolatedAsync(
-                    $"UPDATE ProductVariants SET StockQuantity = StockQuantity + {item.Quantity} WHERE Id = {item.VariantId}");
-            }
-
-            order.Status = "Cancelled";
-            order.UpdatedAt = now;
-
-            _context.OrderStatusHistories.Add(new OrderStatusHistory
-            {
-                OrderId = order.Id,
-                OldStatus = oldStatus,
-                NewStatus = "Cancelled",
-                ChangedBy = userId,
-                Note = "Khách hàng tự hủy đơn hàng",
-                CreatedAt = now
-            });
-
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
-
-            return Ok(new { message = "Đã hủy đơn hàng thành công." });
-        }
-        catch
-        {
-            await transaction.RollbackAsync();
-            throw;
-        }
     }
 }

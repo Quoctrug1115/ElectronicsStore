@@ -5,6 +5,8 @@ import '../admin/admin_dashboard_screen.dart';
 import '../admin/brand_list_screen.dart';
 import '../admin/category_list_screen.dart';
 import '../admin/product_list_screen.dart';
+import '../admin/user_list_screen.dart';
+import '../member/order_history_screen.dart';
 
 class AdminHome extends StatefulWidget {
   const AdminHome({super.key});
@@ -21,6 +23,17 @@ class _AdminHomeState extends State<AdminHome> {
   int _dashboardKey = 0;
   int _listsKey = 0;
 
+  /// Danh mục / Thương hiệu mở như màn riêng (thanh điều hướng chỉ đủ chỗ cho 5 tab).
+  Future<void> _openPage(Widget page) async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
+    if (mounted) {
+      setState(() {
+        _dashboardKey++;
+        _listsKey++;
+      });
+    }
+  }
+
   void _select(int i) {
     setState(() {
       if (i == 0 && _index != 0) _dashboardKey++;
@@ -36,14 +49,16 @@ class _AdminHomeState extends State<AdminHome> {
         return AdminDashboardScreen(
           key: ValueKey('dash$_dashboardKey'),
           onNavigate: _select,
+          onOpenCategories: () => _openPage(const CategoryListScreen()),
+          onOpenBrands: () => _openPage(const BrandListScreen()),
           onDataChanged: () => setState(() => _listsKey++),
         );
       case 1:
         return ProductListScreen(key: ValueKey('products$_listsKey'));
       case 2:
-        return CategoryListScreen(key: ValueKey('categories$_listsKey'));
+        return const OrderHistoryScreen(admin: true);
       case 3:
-        return BrandListScreen(key: ValueKey('brands$_listsKey'));
+        return const UserListScreen();
       default:
         return const AccountTab(isAdmin: true);
     }
@@ -72,14 +87,14 @@ class _AdminHomeState extends State<AdminHome> {
             label: 'Sản phẩm',
           ),
           NavigationDestination(
-            icon: Icon(Icons.category_outlined),
-            selectedIcon: Icon(Icons.category),
-            label: 'Danh mục',
+            icon: Icon(Icons.receipt_long_outlined),
+            selectedIcon: Icon(Icons.receipt_long),
+            label: 'Đơn hàng',
           ),
           NavigationDestination(
-            icon: Icon(Icons.storefront_outlined),
-            selectedIcon: Icon(Icons.storefront),
-            label: 'Thương hiệu',
+            icon: Icon(Icons.people_outline),
+            selectedIcon: Icon(Icons.people),
+            label: 'Thành viên',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),

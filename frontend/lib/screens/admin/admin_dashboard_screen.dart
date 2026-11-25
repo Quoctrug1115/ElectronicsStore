@@ -5,10 +5,13 @@ import '../../core/format.dart';
 import '../../models/brand_models.dart';
 import '../../models/category_models.dart';
 import '../../models/product_models.dart';
+import '../../models/revenue_models.dart';
 import '../../services/brand_service.dart';
+import '../../services/admin_stats_service.dart';
 import '../../services/category_service.dart';
 import '../../services/product_service.dart';
 import '../../widgets/admin_widgets.dart';
+import '../../widgets/revenue_section.dart';
 import 'brand_form_screen.dart';
 import 'category_form_screen.dart';
 import 'product_form_screen.dart';
@@ -17,10 +20,14 @@ class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({
     super.key,
     required this.onNavigate,
+    required this.onOpenCategories,
+    required this.onOpenBrands,
     required this.onDataChanged,
   });
 
   final ValueChanged<int> onNavigate;
+  final VoidCallback onOpenCategories;
+  final VoidCallback onOpenBrands;
 
   final VoidCallback onDataChanged;
 
@@ -34,6 +41,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     client: http.Client(),
   );
   final BrandService _brandService = BrandService(client: http.Client());
+  final AdminStatsService _statsService = AdminStatsService(client: http.Client());
+
+  RevenueStats? _revenue;
+  bool _revenueLoading = true;
+  String? _revenueError;
 
   PagedResult<ProductListItem>? _products;
   List<CategoryResponse> _categories = [];
@@ -48,6 +60,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Future<void> _load() async {
+    _loadRevenue();
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -74,6 +87,52 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
+  /// Doanh thu tải riêng: nếu lỗi (ví dụ backend cũ chưa có API) thì các phần còn lại của Tổng quan vẫn hiện.
+  Future<void> _loadRevenue() async {
+    setState(() {
+      _revenueLoading = true;
+      _revenueError = null;
+    });
+    try {
+      final stats = await _statsService.getRevenue();
+      if (!mounted) return;
+      setState(() {
+        _revenue = stats;
+        _revenueLoading = false;
+      });
+    } on Exception catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _revenueLoading = false;
+        _revenueError = e.toString();
+      });
+    }
+  }
+
+  Widget _buildRevenue() {
+    final stats = _revenue;
+    if (stats != null) return RevenueSection(stats: stats);
+    if (_revenueLoading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(_revenueError ?? 'Không tải được doanh thu.'),
+            const SizedBox(height: 8),
+            TextButton(onPressed: _loadRevenue, child: const Text('Thử lại')),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _quickAdd(Widget form) async {
     await Navigator.of(context)
         .push<bool>(MaterialPageRoute(builder: (_) => form));
@@ -94,6 +153,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           children: [
             _buildHeader(context),
             const SizedBox(height: 16),
+            _sectionTitle(context, 'Doanh thu'),
+            const SizedBox(height: 8),
+            _buildRevenue(),
+            const SizedBox(height: 20),
             if (_isLoading && _products == null)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 64),
@@ -188,7 +251,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             value: '${_categories.length}',
             label: 'Danh mục',
             caption: '$activeCats hoạt động',
-            onTap: () => widget.onNavigate(2),
+            onTap: widget.onOpenCategories,
           ),
         ),
         const SizedBox(width: 10),
@@ -198,7 +261,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             value: '${_brands.length}',
             label: 'Thương hiệu',
             caption: '$activeBrands hoạt động',
-            onTap: () => widget.onNavigate(3),
+            onTap: widget.onOpenBrands,
           ),
         ),
       ],

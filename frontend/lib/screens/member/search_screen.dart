@@ -4,16 +4,14 @@ import 'package:frontend/screens/member/cart_screen.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/format.dart';
-import '../../models/cart_models.dart';
 import '../../models/product_models.dart';
 import '../../providers/cart_provider.dart';
 import '../../services/product_service.dart';
 import '../../widgets/error_banner.dart';
 import '../member/product_detail_screen.dart';
-import '../../widgets/top_notice.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
-  SearchScreen({super.key});
+  const SearchScreen({super.key});
 
   @override
   ConsumerState<SearchScreen> createState() => _SearchScreenState();
@@ -126,11 +124,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           IconButton(
             icon: Badge(
               isLabelVisible: cartQuantity > 0,
-              label: cartQuantity > 99 ? const Text('99+') : Text('$cartQuantity'),
+              label:
+                  cartQuantity > 99 ? const Text('99+') : Text('$cartQuantity'),
               child: const Icon(Icons.shopping_cart_outlined),
             ),
             onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const CartScreen()));
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CartScreen()),
+              );
             },
             tooltip: 'Giỏ hàng',
           ),
@@ -224,7 +226,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                                 ),
                                 const SizedBox(height: 12),
                                 const Center(
-                                    child: Text('Không tìm thấy sản phẩm nào.')),
+                                  child: Text('Không tìm thấy sản phẩm nào.'),
+                                ),
                               ],
                             ),
                           )
@@ -295,7 +298,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final hasDiscount = p.compareAtPrice != null && p.compareAtPrice! > p.price;
-    final isOutOfStock = !p.isActive;
+    final isOutOfStock = !p.inStock;
 
     return Card(
       child: InkWell(
@@ -369,10 +372,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         onTap: isOutOfStock
                             ? null
                             : () {
-                                ref.read(cartProvider.notifier).addItem(
-                                  CartItem(product: p, quantity: 1),
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        ProductDetailScreen(productId: p.id),
+                                  ),
                                 );
-                                showTopNotice(context, 'Đã thêm "${p.name}" vào giỏ hàng', duration: const Duration(seconds: 1));
                               },
                         borderRadius: BorderRadius.circular(20),
                         child: Padding(
@@ -382,7 +388,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                Icons.add_shopping_cart,
+                                Icons.shopping_bag_outlined,
                                 size: 16,
                                 color: isOutOfStock
                                     ? scheme.surface
@@ -390,7 +396,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                'Thêm',
+                                'Chọn mua',
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,

@@ -4,29 +4,28 @@ import 'package:frontend/screens/member/cart_screen.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/format.dart';
-import '../../models/cart_models.dart';
 import '../../models/category_models.dart';
 import '../../models/product_models.dart';
 import '../../providers/cart_provider.dart';
 import '../../services/product_service.dart';
 import '../../widgets/error_banner.dart';
 import '../member/product_detail_screen.dart';
-import '../../widgets/top_notice.dart';
 
 class CategoryProductsScreen extends ConsumerStatefulWidget {
   final CategoryResponse category;
 
-  CategoryProductsScreen({super.key, required this.category});
+  const CategoryProductsScreen({super.key, required this.category});
 
   @override
-  ConsumerState<CategoryProductsScreen> createState() => _CategoryProductsScreenState();
+  ConsumerState<CategoryProductsScreen> createState() =>
+      _CategoryProductsScreenState();
 }
 
-class _CategoryProductsScreenState extends ConsumerState<CategoryProductsScreen> {
+class _CategoryProductsScreenState
+    extends ConsumerState<CategoryProductsScreen> {
   final ProductService _productService = ProductService(client: http.Client());
 
   final List<ProductListItem> _products = [];
-  // false: _loadProducts() thoát ngay nếu cờ này là true, nên lần tải đầu trong initState sẽ không chạy.
   bool _isLoading = false;
   bool _hasMore = true;
   int _pageIndex = 1;
@@ -112,11 +111,15 @@ class _CategoryProductsScreenState extends ConsumerState<CategoryProductsScreen>
           IconButton(
             icon: Badge(
               isLabelVisible: cartQuantity > 0,
-              label: cartQuantity > 99 ? const Text('99+') : Text('$cartQuantity'),
+              label:
+                  cartQuantity > 99 ? const Text('99+') : Text('$cartQuantity'),
               child: const Icon(Icons.shopping_cart_outlined),
             ),
             onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const CartScreen()));
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CartScreen()),
+              );
             },
             tooltip: 'Giỏ hàng',
           ),
@@ -140,7 +143,10 @@ class _CategoryProductsScreenState extends ConsumerState<CategoryProductsScreen>
                     const SizedBox(height: 96),
                     ErrorBanner(message: _errorMessage!),
                     const SizedBox(height: 16),
-                    FilledButton(onPressed: () => _loadProducts(reset: true), child: const Text('Thử lại')),
+                    FilledButton(
+                      onPressed: () => _loadProducts(reset: true),
+                      child: const Text('Thử lại'),
+                    ),
                   ],
                 ),
               )
@@ -156,7 +162,9 @@ class _CategoryProductsScreenState extends ConsumerState<CategoryProductsScreen>
                       color: Theme.of(context).colorScheme.outline,
                     ),
                     const SizedBox(height: 12),
-                    const Center(child: Text('Danh mục này chưa có sản phẩm nào.')),
+                    const Center(
+                      child: Text('Danh mục này chưa có sản phẩm nào.'),
+                    ),
                   ],
                 ),
               )
@@ -189,7 +197,7 @@ class _CategoryProductsScreenState extends ConsumerState<CategoryProductsScreen>
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final hasDiscount = p.compareAtPrice != null && p.compareAtPrice! > p.price;
-    final isOutOfStock = !p.isActive;
+    final isOutOfStock = !p.inStock;
 
     return Card(
       child: InkWell(
@@ -263,10 +271,13 @@ class _CategoryProductsScreenState extends ConsumerState<CategoryProductsScreen>
                         onTap: isOutOfStock
                             ? null
                             : () {
-                                ref.read(cartProvider.notifier).addItem(
-                                  CartItem(product: p, quantity: 1),
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        ProductDetailScreen(productId: p.id),
+                                  ),
                                 );
-                                showTopNotice(context, 'Đã thêm "${p.name}" vào giỏ hàng', duration: const Duration(seconds: 1));
                               },
                         borderRadius: BorderRadius.circular(20),
                         child: Padding(
@@ -276,7 +287,7 @@ class _CategoryProductsScreenState extends ConsumerState<CategoryProductsScreen>
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                Icons.add_shopping_cart,
+                                Icons.shopping_bag_outlined,
                                 size: 16,
                                 color: isOutOfStock
                                     ? scheme.surface
@@ -284,7 +295,7 @@ class _CategoryProductsScreenState extends ConsumerState<CategoryProductsScreen>
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                'Thêm',
+                                'Chọn mua',
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,

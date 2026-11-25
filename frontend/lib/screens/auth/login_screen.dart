@@ -9,7 +9,9 @@ import '../../services/zalo_auth_service.dart';
 import '../../widgets/error_banner.dart';
 import '../home/admin_home.dart';
 import '../home/member_home.dart';
+import 'email_otp_screen.dart';
 import 'register_screen.dart';
+import '../../widgets/top_notice.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, this.authService});
@@ -70,9 +72,8 @@ class _LoginScreenState extends State<LoginScreen> {
     final Widget home = result.user.roles.contains('Admin')
         ? const AdminHome()
         : MemberHome();
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => home),
-    );
+    Navigator.of(context)
+        .pushReplacement(MaterialPageRoute(builder: (_) => home));
   }
 
   Future<void> _googleSignIn() async {
@@ -139,12 +140,30 @@ class _LoginScreenState extends State<LoginScreen> {
     if (registeredEmail != null && mounted) {
       _emailController.text = registeredEmail;
       _passwordController.clear();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đăng ký thành công! Vui lòng đăng nhập.'),
+      showTopNotice(context, 'Đăng ký thành công! Vui lòng xác thực email rồi đăng nhập.');
+      // Backend đã gửi OTP lúc đăng ký; xác thực là tùy chọn (đăng nhập không bị chặn).
+      await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => EmailOtpScreen(
+            purpose: OtpPurpose.verifyEmail,
+            initialEmail: registeredEmail,
+            otpAlreadySent: true,
+          ),
         ),
       );
     }
+  }
+
+  Future<void> _openForgotPassword() async {
+    final done = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => EmailOtpScreen(
+          purpose: OtpPurpose.resetPassword,
+          initialEmail: _emailController.text.trim(),
+        ),
+      ),
+    );
+    if (done == true && mounted) _passwordController.clear();
   }
 
   @override
@@ -245,11 +264,18 @@ class _LoginScreenState extends State<LoginScreen> {
                           ? 'Vui lòng nhập mật khẩu'
                           : null,
                     ),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: _isLoading ? null : _openForgotPassword,
+                        child: const Text('Quên mật khẩu?'),
+                      ),
+                    ),
                     if (_errorMessage != null) ...[
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 8),
                       ErrorBanner(message: _errorMessage!),
                     ],
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
                     FilledButton(
                       onPressed: _isLoading ? null : _submit,
                       style: FilledButton.styleFrom(

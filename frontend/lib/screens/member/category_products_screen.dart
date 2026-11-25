@@ -11,6 +11,7 @@ import '../../providers/cart_provider.dart';
 import '../../services/product_service.dart';
 import '../../widgets/error_banner.dart';
 import '../member/product_detail_screen.dart';
+import '../../widgets/top_notice.dart';
 
 class CategoryProductsScreen extends ConsumerStatefulWidget {
   final CategoryResponse category;
@@ -25,7 +26,8 @@ class _CategoryProductsScreenState extends ConsumerState<CategoryProductsScreen>
   final ProductService _productService = ProductService(client: http.Client());
 
   final List<ProductListItem> _products = [];
-  bool _isLoading = true;
+  // false: _loadProducts() thoát ngay nếu cờ này là true, nên lần tải đầu trong initState sẽ không chạy.
+  bool _isLoading = false;
   bool _hasMore = true;
   int _pageIndex = 1;
   final int _pageSize = 10;
@@ -72,6 +74,7 @@ class _CategoryProductsScreenState extends ConsumerState<CategoryProductsScreen>
         pageSize: _pageSize,
         categoryId: widget.category.id,
         sortBy: 'newest',
+        useOffline: true,
       );
 
       if (!mounted) return;
@@ -263,13 +266,7 @@ class _CategoryProductsScreenState extends ConsumerState<CategoryProductsScreen>
                                 ref.read(cartProvider.notifier).addItem(
                                   CartItem(product: p, quantity: 1),
                                 );
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Đã thêm "${p.name}" vào giỏ hàng'),
-                                    duration: const Duration(seconds: 1),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
+                                showTopNotice(context, 'Đã thêm "${p.name}" vào giỏ hàng', duration: const Duration(seconds: 1));
                               },
                         borderRadius: BorderRadius.circular(20),
                         child: Padding(

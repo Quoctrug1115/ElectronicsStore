@@ -12,6 +12,7 @@ import '../../services/category_service.dart';
 import '../../services/product_service.dart';
 import '../../widgets/error_banner.dart';
 import 'product_detail_screen.dart';
+import '../../widgets/top_notice.dart';
 
 class MemberProductListScreen extends ConsumerStatefulWidget {
   final String? initialSortBy;
@@ -32,7 +33,8 @@ class _MemberProductListScreenState extends ConsumerState<MemberProductListScree
   final List<ProductListItem> _products = [];
   List<CategoryResponse> _categories = [];
   bool _isLoadingCategories = true;
-  bool _isLoadingProducts = true;
+  // false: _loadProducts() thoát ngay nếu cờ này là true (lần tải đầu trong initState sẽ không chạy).
+  bool _isLoadingProducts = false;
   bool _hasMoreProducts = true;
   int _pageIndex = 1;
   final int _pageSize = 10;
@@ -65,7 +67,7 @@ class _MemberProductListScreenState extends ConsumerState<MemberProductListScree
 
   Future<void> _loadCategories() async {
     try {
-      final categories = await _categoryService.getCategories(isActive: true);
+      final categories = await _categoryService.getCategories(isActive: true, useOffline: true);
       if (!mounted) return;
       setState(() {
         _categories = categories;
@@ -101,6 +103,7 @@ class _MemberProductListScreenState extends ConsumerState<MemberProductListScree
         search: _search.isEmpty ? null : _search,
         categoryId: _categoryId,
         sortBy: widget.initialSortBy ?? 'newest',
+        useOffline: true,
       );
 
       if (!mounted) return;
@@ -392,13 +395,7 @@ class _MemberProductListScreenState extends ConsumerState<MemberProductListScree
                                 ref.read(cartProvider.notifier).addItem(
                                   CartItem(product: p, quantity: 1),
                                 );
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Đã thêm "${p.name}" vào giỏ hàng'),
-                                    duration: const Duration(seconds: 1),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
+                                showTopNotice(context, 'Đã thêm "${p.name}" vào giỏ hàng', duration: const Duration(seconds: 1));
                               },
                         borderRadius: BorderRadius.circular(20),
                         child: Padding(

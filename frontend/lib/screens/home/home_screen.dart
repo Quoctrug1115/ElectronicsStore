@@ -61,7 +61,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Future<void> _loadCategories() async {
     try {
-      final categories = await _categoryService.getCategories(isActive: true);
+      final categories = await _categoryService.getCategories(isActive: true, useOffline: true);
       if (!mounted) return;
       setState(() {
         _categories = categories;
@@ -96,6 +96,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         pageIndex: _latestPage,
         pageSize: _pageSize,
         sortBy: 'newest',
+        useOffline: true,
       );
 
       if (!mounted) return;

@@ -10,6 +10,7 @@ import '../../providers/cart_provider.dart';
 import '../../services/product_service.dart';
 import '../../widgets/error_banner.dart';
 import '../member/product_detail_screen.dart';
+import '../../widgets/top_notice.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   SearchScreen({super.key});
@@ -73,6 +74,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         pageSize: _pageSize,
         search: _currentQuery.trim(),
         sortBy: 'newest',
+        useOffline: true,
       );
 
       if (!mounted) return;
@@ -370,13 +372,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                                 ref.read(cartProvider.notifier).addItem(
                                   CartItem(product: p, quantity: 1),
                                 );
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Đã thêm "${p.name}" vào giỏ hàng'),
-                                    duration: const Duration(seconds: 1),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
+                                showTopNotice(context, 'Đã thêm "${p.name}" vào giỏ hàng', duration: const Duration(seconds: 1));
                               },
                         borderRadius: BorderRadius.circular(20),
                         child: Padding(

@@ -7,7 +7,9 @@ import '../../models/cart_models.dart';
 import '../../models/product_models.dart';
 import '../../providers/cart_provider.dart';
 import '../../services/product_service.dart';
+
 import 'package:http/http.dart' as http;
+import '../../widgets/top_notice.dart';
 
 class ProductDetailScreen extends ConsumerStatefulWidget {
   final int productId;
@@ -15,7 +17,8 @@ class ProductDetailScreen extends ConsumerStatefulWidget {
   ProductDetailScreen({super.key, required this.productId});
 
   @override
-  ConsumerState<ProductDetailScreen> createState() => _ProductDetailScreenState();
+  ConsumerState<ProductDetailScreen> createState() =>
+      _ProductDetailScreenState();
 }
 
 class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
@@ -40,7 +43,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       _errorMessage = null;
     });
     try {
-      final product = await _productService.getProductById(widget.productId);
+      final product = await _productService.getProductById(widget.productId, useOffline: true);
       if (!mounted) return;
       setState(() {
         _product = product;
@@ -76,13 +79,14 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
   bool get _canBuy =>
       (_selectedVariant?.isActive ?? false) && _stock > 0 && _inCart < _stock;
 
-  double get _currentPrice => _selectedVariant?.price ?? _product?.variants.first.price ?? 0.0;
+  double get _currentPrice =>
+      _selectedVariant?.price ?? _product?.variants.first.price ?? 0.0;
 
-  bool get _isInStock => _selectedVariant?.isActive ?? _product?.isActive ?? false;
+  bool get _isInStock =>
+      _selectedVariant?.isActive ?? _product?.isActive ?? false;
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       appBar: AppBar(
         title: _product != null
@@ -92,10 +96,10 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
-              ? _buildError()
-              : _product == null
-                  ? const Center(child: Text('Không tìm thấy sản phẩm'))
-                  : _buildProductDetail(),
+          ? _buildError()
+          : _product == null
+          ? const Center(child: Text('Không tìm thấy sản phẩm'))
+          : _buildProductDetail(),
       bottomNavigationBar: _product != null && _isInStock
           ? _buildBottomBar()
           : null,
@@ -130,7 +134,9 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final hasDiscount = product.variants.isNotEmpty
-        ? _selectedVariant != null && _selectedVariant!.compareAtPrice != null && _selectedVariant!.compareAtPrice! > _selectedVariant!.price
+        ? _selectedVariant != null &&
+              _selectedVariant!.compareAtPrice != null &&
+              _selectedVariant!.compareAtPrice! > _selectedVariant!.price
         : false;
 
     final images = product.images.where((img) => img.isPrimary).toList();
@@ -204,10 +210,21 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                       const SizedBox(height: 24),
                       const Divider(),
                       const SizedBox(height: 16),
-                      if (product.description != null && product.description!.isNotEmpty) ...[
-                        Text('Mô tả sản phẩm', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                      if (product.description != null &&
+                          product.description!.isNotEmpty) ...[
+                        Text(
+                          'Mô tả sản phẩm',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                         const SizedBox(height: 8),
-                        Text(product.description!, style: theme.textTheme.bodyMedium?.copyWith(height: 1.5)),
+                        Text(
+                          product.description!,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            height: 1.5,
+                          ),
+                        ),
                         const SizedBox(height: 16),
                       ],
                       if (product.variants.isNotEmpty) _buildVariantDetails(),
@@ -243,7 +260,8 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
           aspectRatio: 1,
           child: PageView.builder(
             itemCount: images.length,
-            onPageChanged: (index) => setState(() => _selectedImageIndex = index),
+            onPageChanged: (index) =>
+                setState(() => _selectedImageIndex = index),
             itemBuilder: (context, index) {
               final img = images[index];
               return Image.network(
@@ -258,7 +276,8 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                   return Center(
                     child: CircularProgressIndicator(
                       value: loadingProgress.expectedTotalBytes != null
-                          ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                          ? loadingProgress.cumulativeBytesLoaded /
+                                loadingProgress.expectedTotalBytes!
                           : null,
                     ),
                   );
@@ -301,7 +320,12 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Phiên bản', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+          Text(
+            'Phiên bản',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
@@ -315,13 +339,15 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                 selected: isSelected,
                 onSelected: isActive
                     ? (_) => setState(() {
-                          _selectedVariant = variant;
-                          _quantity = 1;
-                        })
+                        _selectedVariant = variant;
+                        _quantity = 1;
+                      })
                     : null,
                 selectedColor: scheme.primaryContainer,
                 labelStyle: TextStyle(
-                  color: isSelected ? scheme.onPrimaryContainer : scheme.onSurface,
+                  color: isSelected
+                      ? scheme.onPrimaryContainer
+                      : scheme.onSurface,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                 ),
                 side: BorderSide(
@@ -333,6 +359,16 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
         ],
       ),
     );
+  }
+
+  /// Nhãn tồn kho ngắn gọn. Giỏ hàng không giữ hàng (kho chỉ bị trừ khi đặt đơn),
+  /// nên hiển thị cả tồn thật lẫn số đã chọn trong giỏ.
+  String _stockLabel(ProductVariant variant) {
+    if (!variant.inStock) return 'Hết hàng';
+    final inCart = variant.id == _selectedVariant?.id ? _inCart : 0;
+    if (inCart <= 0) return 'Còn ${variant.stockQuantity} sản phẩm';
+    if (inCart >= variant.stockQuantity) return 'Đã chọn hết số còn lại';
+    return 'Còn ${variant.stockQuantity} (đã chọn $inCart)';
   }
 
   String _getVariantLabel(ProductVariant variant) {
@@ -351,14 +387,21 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Thông số kỹ thuật', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+        Text(
+          'Thông số kỹ thuật',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
         const SizedBox(height: 12),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               children: product.variants.map((variant) {
-                final hasDiscount = variant.compareAtPrice != null && variant.compareAtPrice! > variant.price;
+                final hasDiscount =
+                    variant.compareAtPrice != null &&
+                    variant.compareAtPrice! > variant.price;
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Row(
@@ -369,54 +412,65 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                           children: [
                             Text(
                               _getVariantLabel(variant),
-                              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             Text(
                               'SKU: ${variant.sku}',
-                              style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
                             ),
                           ],
                         ),
                       ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            formatVnd(variant.price),
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: scheme.primary,
-                            ),
-                          ),
-                          if (hasDiscount)
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 150),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
                             Text(
-                              formatVnd(variant.compareAtPrice!),
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: scheme.onSurfaceVariant,
-                                decoration: TextDecoration.lineThrough,
+                              formatVnd(variant.price),
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: scheme.primary,
                               ),
                             ),
-                          Container(
-                            margin: const EdgeInsets.only(top: 4),
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: variant.inStock
-                                  ? Colors.green.withValues(alpha: 0.1)
-                                  : scheme.errorContainer,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              variant.inStock
-                                  ? 'Còn ${variant.stockQuantity} sản phẩm'
-                                  : 'Hết hàng',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: variant.inStock ? Colors.green : scheme.error,
+                            if (hasDiscount)
+                              Text(
+                                formatVnd(variant.compareAtPrice!),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                  decoration: TextDecoration.lineThrough,
+                                ),
+                              ),
+                            Container(
+                              margin: const EdgeInsets.only(top: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: variant.inStock
+                                    ? Colors.green.withValues(alpha: 0.1)
+                                    : scheme.errorContainer,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                _stockLabel(variant),
+                                textAlign: TextAlign.end,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: variant.inStock
+                                      ? Colors.green
+                                      : scheme.error,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -435,7 +489,12 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
 
     return Row(
       children: [
-        Text('Số lượng:', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+        Text(
+          'Số lượng:',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         const SizedBox(width: 16),
         Container(
           decoration: BoxDecoration(
@@ -447,7 +506,9 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
             children: [
               IconButton(
                 icon: const Icon(Icons.remove),
-                onPressed: _quantity > 1 ? () => setState(() => _quantity--) : null,
+                onPressed: _quantity > 1
+                    ? () => setState(() => _quantity--)
+                    : null,
                 constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
                 padding: EdgeInsets.zero,
               ),
@@ -456,7 +517,9 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                 alignment: Alignment.center,
                 child: Text(
                   '$_quantity',
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
               IconButton(
@@ -499,9 +562,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
               child: OutlinedButton.icon(
                 onPressed: () {
                   // Add to wishlist - future feature
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Đã thêm vào danh sách yêu thích')),
-                  );
+                  showTopNotice(context, 'Đã thêm vào danh sách yêu thích');
                 },
                 icon: const Icon(Icons.favorite_border),
                 label: const Text('Yêu thích'),
@@ -516,9 +577,11 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
               child: FilledButton.icon(
                 onPressed: _canBuy ? _addToCart : null,
                 icon: const Icon(Icons.add_shopping_cart),
-                label: Text(_stock <= 0 || !(_selectedVariant?.isActive ?? false)
-                    ? 'Hết hàng'
-                    : 'Thêm vào giỏ'),
+                label: Text(
+                  _stock <= 0 || !(_selectedVariant?.isActive ?? false)
+                      ? 'Hết hàng'
+                      : (_inCart >= _stock ? 'Đã hết hàng' : 'Thêm vào giỏ'),
+                ),
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
@@ -536,14 +599,9 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
     // Kiểm tra tồn kho: số lượng thêm + số đã có trong giỏ không vượt quá tồn
     final available = _stock - _inCart;
     if (_quantity > available) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(available <= 0
-              ? 'Bạn đã thêm tối đa số lượng còn trong kho ($_stock).'
-              : 'Chỉ còn thêm được $available sản phẩm (kho còn $_stock).'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      showTopNotice(context, available <= 0
+                ? 'Bạn đã thêm tối đa số lượng còn trong kho ($_stock).'
+                : 'Chỉ còn thêm được $available sản phẩm (kho còn $_stock).');
       setState(() => _quantity = available > 0 ? available : 1);
       return;
     }
@@ -557,7 +615,9 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
         brandName: product.brandName,
         price: _currentPrice,
         compareAtPrice: _selectedVariant?.compareAtPrice,
-        primaryImageUrl: product.images.isNotEmpty ? product.images.first.imageUrl : null,
+        primaryImageUrl: product.images.isNotEmpty
+            ? product.images.first.imageUrl
+            : null,
         stockQuantity: _stock,
         isActive: product.isActive,
         createdAt: product.createdAt,
@@ -567,19 +627,18 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
     );
 
     ref.read(cartProvider.notifier).addItem(cartItem);
+    final addedQuantity = _quantity;
     setState(() => _quantity = 1);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Đã thêm $_quantity "${product.name}" vào giỏ hàng'),
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-        action: SnackBarAction(
-          label: 'Xem giỏ',
-          onPressed: () {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const CartScreen()));
-          },
-        ),
+    // Lấy trước navigator: nếu người dùng đã rời màn này thì `context` của State
+    // đã bị hủy và bấm "Xem giỏ" sẽ ném lỗi "unmounted".
+    final navigator = Navigator.of(context);
+    showTopNotice(
+      context,
+      'Đã thêm $addedQuantity "${product.name}" vào giỏ hàng',
+      actionLabel: 'Xem giỏ',
+      onAction: () => navigator.push(
+        MaterialPageRoute(builder: (_) => const CartScreen()),
       ),
     );
   }

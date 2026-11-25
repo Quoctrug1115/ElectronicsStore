@@ -135,6 +135,11 @@ public class BrandsController : ControllerBase
             DeletePhysicalImage(brand.LogoUrl);
             brand.LogoUrl = saveResult.RelativePath;
         }
+        else if (request.RemoveLogo)
+        {
+            DeletePhysicalImage(brand.LogoUrl);
+            brand.LogoUrl = null;
+        }
 
         brand.Name = request.Name.Trim();
         brand.Description = request.Description?.Trim();

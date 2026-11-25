@@ -39,5 +39,7 @@ public class UpdateBrandRequest
 
     public bool IsActive { get; set; } = true;
 
+    public bool RemoveLogo { get; set; }
+
     public IFormFile? LogoFile { get; set; }
 }

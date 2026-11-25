@@ -82,6 +82,7 @@ class BrandService {
     int id,
     BrandRequest request, {
     File? logoFile,
+    bool removeLogo = false,
   }) async {
     final requestMulti =
         http.MultipartRequest(
@@ -89,7 +90,8 @@ class BrandService {
             Uri.parse('${ApiConfig.baseUrl}${ApiConfig.brands}/$id'),
           )
           ..headers.addAll(await ApiClient.authHeaders())
-          ..fields.addAll(request.toFormFields());
+          ..fields.addAll(request.toFormFields())
+          ..fields['RemoveLogo'] = removeLogo.toString();
 
     if (logoFile != null) {
       requestMulti.files.add(

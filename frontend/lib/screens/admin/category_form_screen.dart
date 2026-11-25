@@ -35,6 +35,7 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
   int? _parentId;
   File? _pickedImage;
   String? _pickedImagePreviewUrl;
+  bool _removeExistingImage = false;
 
   bool get _isEdit => widget.category != null;
   CategoryService get _service => widget.categoryService;
@@ -43,6 +44,13 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
   void initState() {
     super.initState();
     _initForm();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
   }
 
   Future<void> _initForm() async {
@@ -83,11 +91,12 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
     setState(() {
       _pickedImage = File(picked.path);
       _pickedImagePreviewUrl = null;
+      _removeExistingImage = false;
     });
   }
 
   String? _currentImageUrl() {
-    if (_pickedImage != null) return null;
+    if (_pickedImage != null || _removeExistingImage) return null;
     if (_pickedImagePreviewUrl != null) return _pickedImagePreviewUrl!;
     if (_isEdit) return widget.category!.fullImageUrl;
     return null;
@@ -117,6 +126,7 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
           widget.category!.id,
           request,
           imageFile: _pickedImage,
+          removeImage: _removeExistingImage,
         );
       } else {
         await _service.createCategory(
@@ -125,7 +135,12 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
         );
       }
       if (!mounted) return;
-      showTopNotice(context, _isEdit ? 'Cập nhật danh mục thành công.' : 'Thêm danh mục thành công.');
+      showTopNotice(
+        context,
+        _isEdit
+            ? 'Cập nhật danh mục thành công.'
+            : 'Thêm danh mục thành công.',
+      );
       Navigator.of(context).pop(true);
     } on Exception catch (e) {
       if (!mounted) return;
@@ -338,7 +353,10 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
                 backgroundColor: Theme.of(context).colorScheme.error,
                 child: IconButton(
                   icon: const Icon(Icons.close, size: 18, color: Colors.white),
-                  onPressed: () => setState(() => _pickedImagePreviewUrl = null),
+                  onPressed: () => setState(() {
+                    _pickedImagePreviewUrl = null;
+                    _removeExistingImage = true;
+                  }),
                   tooltip: 'Xóa ảnh',
                 ),
               ),

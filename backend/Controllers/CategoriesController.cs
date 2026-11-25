@@ -180,6 +180,11 @@ public class CategoriesController : ControllerBase
             DeletePhysicalImage(category.ImageUrl);
             category.ImageUrl = saveResult.RelativePath;
         }
+        else if (request.RemoveImage)
+        {
+            DeletePhysicalImage(category.ImageUrl);
+            category.ImageUrl = null;
+        }
 
         category.Name = request.Name.Trim();
         category.ParentId = request.ParentId;

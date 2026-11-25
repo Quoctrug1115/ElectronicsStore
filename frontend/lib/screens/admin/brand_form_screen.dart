@@ -32,6 +32,7 @@ class _BrandFormScreenState extends State<BrandFormScreen> {
   bool _isActive = true;
   File? _pickedLogo;
   String? _pickedLogoPreviewUrl;
+  bool _removeExistingLogo = false;
 
   bool get _isEdit => widget.brand != null;
   BrandService get _service => widget.brandService;
@@ -69,11 +70,12 @@ class _BrandFormScreenState extends State<BrandFormScreen> {
     setState(() {
       _pickedLogo = File(picked.path);
       _pickedLogoPreviewUrl = null;
+      _removeExistingLogo = false;
     });
   }
 
   String? _currentLogoUrl() {
-    if (_pickedLogo != null) return null;
+    if (_pickedLogo != null || _removeExistingLogo) return null;
     if (_pickedLogoPreviewUrl != null) return _pickedLogoPreviewUrl!;
     if (_isEdit) return widget.brand!.fullLogoUrl;
     return null;
@@ -102,6 +104,7 @@ class _BrandFormScreenState extends State<BrandFormScreen> {
           widget.brand!.id,
           request,
           logoFile: _pickedLogo,
+          removeLogo: _removeExistingLogo,
         );
       } else {
         await _service.createBrand(
@@ -299,7 +302,10 @@ class _BrandFormScreenState extends State<BrandFormScreen> {
                 backgroundColor: Theme.of(context).colorScheme.error,
                 child: IconButton(
                   icon: const Icon(Icons.close, size: 18, color: Colors.white),
-                  onPressed: () => setState(() => _pickedLogoPreviewUrl = null),
+                  onPressed: () => setState(() {
+                    _pickedLogoPreviewUrl = null;
+                    _removeExistingLogo = true;
+                  }),
                   tooltip: 'Xóa logo',
                 ),
               ),

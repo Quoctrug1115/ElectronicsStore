@@ -44,7 +44,7 @@ class CategoryService {
     final data = ApiClient.decodeBody(response);
     final status = response.statusCode;
     if (status >= 200 && status < 300) {
-      final list = (data as List<dynamic>).cast<Map<String, dynamic>>();
+      final list = (data as List<dynamic>).cast>();
       if (useOffline) {
         LocalDatabase.offline.value = false;
         await LocalCache.saveCategories(list, replaceAll: isActive == null);
@@ -104,6 +104,7 @@ class CategoryService {
     int id,
     CategoryRequest request, {
     File? imageFile,
+    bool removeImage = false,
   }) async {
     final requestMulti =
         http.MultipartRequest(
@@ -111,7 +112,8 @@ class CategoryService {
             Uri.parse('${ApiConfig.baseUrl}${ApiConfig.categories}/$id'),
           )
           ..headers.addAll(await ApiClient.authHeaders())
-          ..fields.addAll(request.toFormFields());
+          ..fields.addAll(request.toFormFields())
+          ..fields['RemoveImage'] = removeImage.toString();
 
     if (imageFile != null) {
       requestMulti.files.add(

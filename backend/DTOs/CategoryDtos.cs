@@ -45,5 +45,7 @@ public class UpdateCategoryRequest
 
     public bool IsActive { get; set; } = true;
 
+    public bool RemoveImage { get; set; }
+
     public IFormFile? ImageFile { get; set; }
 }

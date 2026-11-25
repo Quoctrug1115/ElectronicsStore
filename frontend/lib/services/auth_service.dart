@@ -3,18 +3,12 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../core/api_client.dart';
 import '../core/api_config.dart';
 import '../models/auth_models.dart';
 
-class ApiException implements Exception {
-  final String message;
-  final int? statusCode;
-
-  const ApiException(this.message, {this.statusCode});
-
-  @override
-  String toString() => message;
-}
+// Giữ đường dẫn import cũ: các màn hình vẫn lấy ApiException từ đây.
+export '../core/api_client.dart' show ApiException;
 
 class AuthService {
   AuthService({http.Client? client}) : _client = client ?? http.Client();
@@ -42,9 +36,42 @@ class AuthService {
   }
 
   Future<AuthResponse> loginWithFacebook(String accessToken) async {
-    final data = await _post(ApiConfig.facebookLogin, {'accessToken': accessToken});
+    final data = await _post(ApiConfig.facebookLogin, {
+      'accessToken': accessToken,
+    });
     return AuthResponse.fromJson(data as Map<String, dynamic>);
   }
+
+  /// Gửi OTP quên mật khẩu tới email.
+  Future<String> forgotPassword(String email) => _postMessage(
+    ApiConfig.forgotPassword,
+    {'email': email},
+    'Đã gửi mã OTP tới email của bạn.',
+  );
+
+  Future<String> resetPassword({
+    required String email,
+    required String otp,
+    required String newPassword,
+    required String confirmNewPassword,
+  }) => _postMessage(ApiConfig.resetPassword, {
+    'email': email,
+    'otp': otp,
+    'newPassword': newPassword,
+    'confirmNewPassword': confirmNewPassword,
+  }, 'Đặt lại mật khẩu thành công.');
+
+  Future<String> sendVerificationOtp(String email) => _postMessage(
+    ApiConfig.sendVerificationOtp,
+    {'email': email},
+    'Đã gửi mã OTP tới email của bạn.',
+  );
+
+  Future<String> verifyEmail({required String email, required String otp}) =>
+      _postMessage(ApiConfig.verifyEmail, {
+        'email': email,
+        'otp': otp,
+      }, 'Xác thực email thành công.');
 
   Future<String> changePassword(
     ChangePasswordRequest request, {
@@ -61,9 +88,15 @@ class AuthService {
     return 'Đổi mật khẩu thành công.';
   }
 
-  Future<String?> getToken() async {
-    // This will be implemented using TokenStorage
-    return null; // Placeholder - actual implementation in TokenStorage
+  Future<String> _postMessage(
+    String path,
+    Map<String, dynamic> body,
+    String fallback,
+  ) async {
+    final data = await _post(path, body);
+    return data is Map && data['message'] is String
+        ? data['message'] as String
+        : fallback;
   }
 
   Future<dynamic> _post(
@@ -93,49 +126,6 @@ class AuthService {
       );
     }
 
-    final data = _decodeBody(response);
-    final status = response.statusCode;
-    if (status >= 200 && status < 300) return data;
-    throw _toApiException(status, data);
-  }
-
-  dynamic _decodeBody(http.Response response) {
-    final text = utf8.decode(response.bodyBytes);
-    if (text.trim().isEmpty) return null;
-    try {
-      return jsonDecode(text);
-    } on FormatException {
-      return text;
-    }
-  }
-
-  ApiException _toApiException(int status, dynamic data) {
-    if (data is Map) {
-      if (data['message'] is String) {
-        return ApiException(data['message'] as String, statusCode: status);
-      }
-      final errors = data['errors'];
-      if (errors is Map && errors.isNotEmpty) {
-        final messages = errors.values
-            .expand((v) => v is List ? v : [v])
-            .map((v) => v.toString())
-            .join('\n');
-        return ApiException(messages, statusCode: status);
-      }
-    }
-
-    if (status == 401) {
-      return const ApiException(
-        'Phiên đăng nhập không hợp lệ hoặc đã hết hạn.',
-        statusCode: 401,
-      );
-    }
-    if (status == 403) {
-      return const ApiException(
-        'Bạn không có quyền thực hiện thao tác này.',
-        statusCode: 403,
-      );
-    }
-    return ApiException('Đã xảy ra lỗi (mã $status).', statusCode: status);
+    return ApiClient.unwrap(response);
   }
 }

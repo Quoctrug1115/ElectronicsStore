@@ -5,6 +5,7 @@ import '../../core/format.dart';
 import '../../models/cart_models.dart';
 import '../../providers/cart_provider.dart';
 import '../member/checkout_screen.dart';
+import '../../widgets/top_notice.dart';
 
 class CartScreen extends ConsumerWidget {
   final VoidCallback? onContinueShopping;
@@ -129,12 +130,17 @@ class CartScreen extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Tổng cộng (${cart.totalQuantity} sản phẩm)',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
+                Expanded(
+                  child: Text(
+                    'Tổng cộng (${cart.totalQuantity} sản phẩm)',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
+                const SizedBox(width: 12),
                 Text(
                   formatVnd(cart.totalPrice),
                   style: theme.textTheme.titleMedium?.copyWith(
@@ -315,12 +321,7 @@ class _QuantityControls extends ConsumerWidget {
               onPressed: () {
                 final stock = item.variant?.stockQuantity;
                 if (stock != null && item.quantity >= stock) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Chỉ còn $stock sản phẩm "${item.name}" trong kho.'),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
+                  showTopNotice(context, 'Chỉ còn $stock sản phẩm "${item.name}" trong kho.');
                   return;
                 }
                 cartNotifier.incrementQuantity(

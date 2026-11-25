@@ -1,20 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/screens/member/cart_screen.dart';
+import 'package:http/http.dart' as http;
 
 import '../../core/format.dart';
 import '../../models/cart_models.dart';
 import '../../models/product_models.dart';
 import '../../providers/cart_provider.dart';
 import '../../services/product_service.dart';
-
-import 'package:http/http.dart' as http;
 import '../../widgets/top_notice.dart';
 
 class ProductDetailScreen extends ConsumerStatefulWidget {
   final int productId;
 
-  ProductDetailScreen({super.key, required this.productId});
+  const ProductDetailScreen({super.key, required this.productId});
 
   @override
   ConsumerState<ProductDetailScreen> createState() =>
@@ -43,7 +42,8 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       _errorMessage = null;
     });
     try {
-      final product = await _productService.getProductById(widget.productId, useOffline: true);
+      final product =
+          await _productService.getProductById(widget.productId, useOffline: true);
       if (!mounted) return;
       setState(() {
         _product = product;
@@ -80,7 +80,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       (_selectedVariant?.isActive ?? false) && _stock > 0 && _inCart < _stock;
 
   double get _currentPrice =>
-      _selectedVariant?.price ?? _product?.variants.first.price ?? 0.0;
+      _selectedVariant?.price ?? _product?.variants.firstOrNull?.price ?? 0.0;
 
   bool get _isInStock =>
       _selectedVariant?.isActive ?? _product?.isActive ?? false;
@@ -139,11 +139,6 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
               _selectedVariant!.compareAtPrice! > _selectedVariant!.price
         : false;
 
-    final images = product.images.where((img) => img.isPrimary).toList();
-    if (images.isEmpty && product.images.isNotEmpty) {
-      images.addAll(product.images);
-    }
-
     return RefreshIndicator(
       onRefresh: _loadProduct,
       child: CustomScrollView(
@@ -152,7 +147,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildImageGallery(images),
+                _buildImageGallery(product.images),
                 if (product.variants.length > 1) _buildVariantSelector(),
                 Padding(
                   padding: const EdgeInsets.all(16),
@@ -599,9 +594,12 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
     // Kiểm tra tồn kho: số lượng thêm + số đã có trong giỏ không vượt quá tồn
     final available = _stock - _inCart;
     if (_quantity > available) {
-      showTopNotice(context, available <= 0
-                ? 'Bạn đã thêm tối đa số lượng còn trong kho ($_stock).'
-                : 'Chỉ còn thêm được $available sản phẩm (kho còn $_stock).');
+      showTopNotice(
+        context,
+        available <= 0
+            ? 'Bạn đã thêm tối đa số lượng còn trong kho ($_stock).'
+            : 'Chỉ còn thêm được $available sản phẩm (kho còn $_stock).',
+      );
       setState(() => _quantity = available > 0 ? available : 1);
       return;
     }

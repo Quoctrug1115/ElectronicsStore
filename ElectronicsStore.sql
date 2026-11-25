@@ -625,18 +625,3 @@ SELECT * FROM Categories;
 SELECT * FROM Brands;
 SELECT * FROM Roles;
 GO
-
-USE ElectronicsStore;
-GO
-
--- 1. Thêm cột StockQuantity vào bảng ProductVariants
-ALTER TABLE ProductVariants
-ADD StockQuantity INT NOT NULL CONSTRAINT DF_ProductVariants_StockQuantity DEFAULT 50;
-GO
-
--- 2. Thêm ràng buộc số lượng >= 0
-ALTER TABLE ProductVariants
-ADD CONSTRAINT CK_ProductVariants_StockQuantity CHECK (StockQuantity >= 0);
-GO
-
-UPDATE Products SET IsDeleted = 0, IsActive = 1 WHERE Id = 1;

@@ -414,8 +414,12 @@ public class OrdersController : ControllerBase
             return Ok(new { message = "Thanh toán đã được xác nhận trước đó." });
 
         var now = DateTime.UtcNow;
+        // Chưa có webhook ngân hàng để kiểm tra tiền về, nên tin vào xác nhận của khách
+        // và đánh dấu đã thanh toán (đồ án). Thực tế nên để Admin/cổng thanh toán xác nhận.
         payment.TransactionCode = $"VQR-{order.OrderCode}";
         payment.GatewayResponse = "Khách hàng xác nhận đã chuyển khoản qua VietQR";
+        payment.Status = "Completed";
+        payment.PaidAt = now;
         order.UpdatedAt = now;
 
         _context.OrderStatusHistories.Add(new OrderStatusHistory
@@ -432,7 +436,7 @@ public class OrdersController : ControllerBase
 
         return Ok(new
         {
-            message = "Đã ghi nhận thông tin chuyển khoản. Cửa hàng sẽ xác nhận đơn hàng của bạn trong giây lát."
+            message = "Đã ghi nhận thanh toán. Cửa hàng sẽ xác nhận đơn hàng của bạn trong giây lát."
         });
     }
 

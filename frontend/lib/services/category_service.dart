@@ -44,7 +44,7 @@ class CategoryService {
     final data = ApiClient.decodeBody(response);
     final status = response.statusCode;
     if (status >= 200 && status < 300) {
-      final list = (data as List<dynamic>).cast>();
+      final list = (data as List<dynamic>).cast<Map<String, dynamic>>();
       if (useOffline) {
         LocalDatabase.offline.value = false;
         await LocalCache.saveCategories(list, replaceAll: isActive == null);

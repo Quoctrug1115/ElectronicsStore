@@ -1,10 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/screens/member/cart_screen.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/format.dart';
-import '../../models/cart_models.dart';
 import '../../models/category_models.dart';
 import '../../models/product_models.dart';
 import '../../providers/cart_provider.dart';
@@ -12,28 +13,30 @@ import '../../services/category_service.dart';
 import '../../services/product_service.dart';
 import '../../widgets/error_banner.dart';
 import 'product_detail_screen.dart';
-import '../../widgets/top_notice.dart';
 
 class MemberProductListScreen extends ConsumerStatefulWidget {
   final String? initialSortBy;
 
-  MemberProductListScreen({super.key, this.initialSortBy});
+  const MemberProductListScreen({super.key, this.initialSortBy});
 
   @override
   ConsumerState<MemberProductListScreen> createState() =>
       _MemberProductListScreenState();
 }
 
-class _MemberProductListScreenState extends ConsumerState<MemberProductListScreen> {
+class _MemberProductListScreenState
+    extends ConsumerState<MemberProductListScreen> {
   final ProductService _productService = ProductService(client: http.Client());
   final CategoryService _categoryService = CategoryService(
     client: http.Client(),
   );
 
+  final TextEditingController _searchController = TextEditingController();
+  Timer? _debounce;
+
   final List<ProductListItem> _products = [];
   List<CategoryResponse> _categories = [];
   bool _isLoadingCategories = true;
-  // false: _loadProducts() thoát ngay nếu cờ này là true (lần tải đầu trong initState sẽ không chạy).
   bool _isLoadingProducts = false;
   bool _hasMoreProducts = true;
   int _pageIndex = 1;
@@ -54,6 +57,8 @@ class _MemberProductListScreenState extends ConsumerState<MemberProductListScree
 
   @override
   void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -67,7 +72,8 @@ class _MemberProductListScreenState extends ConsumerState<MemberProductListScree
 
   Future<void> _loadCategories() async {
     try {
-      final categories = await _categoryService.getCategories(isActive: true, useOffline: true);
+      final categories =
+          await _categoryService.getCategories(isActive: true, useOffline: true);
       if (!mounted) return;
       setState(() {
         _categories = categories;
@@ -132,6 +138,18 @@ class _MemberProductListScreenState extends ConsumerState<MemberProductListScree
   }
 
   void _onSearchChanged(String query) {
+    setState(() {});
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      final trimmed = query.trim();
+      if (trimmed == _search) return;
+      setState(() => _search = trimmed);
+      _loadProducts(reset: true);
+    });
+  }
+
+  void _onSearchSubmitted(String query) {
+    _debounce?.cancel();
     final trimmed = query.trim();
     if (trimmed == _search) return;
     setState(() => _search = trimmed);
@@ -145,7 +163,12 @@ class _MemberProductListScreenState extends ConsumerState<MemberProductListScree
   }
 
   void _clearSearch() {
-    if (_search.isEmpty) return;
+    _debounce?.cancel();
+    _searchController.clear();
+    if (_search.isEmpty) {
+      setState(() {});
+      return;
+    }
     setState(() => _search = '');
     _loadProducts(reset: true);
   }
@@ -161,11 +184,15 @@ class _MemberProductListScreenState extends ConsumerState<MemberProductListScree
           IconButton(
             icon: Badge(
               isLabelVisible: cartQuantity > 0,
-              label: cartQuantity > 99 ? const Text('99+') : Text('$cartQuantity'),
+              label:
+                  cartQuantity > 99 ? const Text('99+') : Text('$cartQuantity'),
               child: const Icon(Icons.shopping_cart_outlined),
             ),
             onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const CartScreen()));
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CartScreen()),
+              );
             },
             tooltip: 'Giỏ hàng',
           ),
@@ -192,7 +219,10 @@ class _MemberProductListScreenState extends ConsumerState<MemberProductListScree
                     const SizedBox(height: 96),
                     ErrorBanner(message: _errorMessage!),
                     const SizedBox(height: 16),
-                    FilledButton(onPressed: () => _loadProducts(reset: true), child: const Text('Thử lại')),
+                    FilledButton(
+                      onPressed: () => _loadProducts(reset: true),
+                      child: const Text('Thử lại'),
+                    ),
                   ],
                 ),
               )
@@ -244,13 +274,12 @@ class _MemberProductListScreenState extends ConsumerState<MemberProductListScree
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           TextField(
-            enabled: !_isLoadingProducts,
             textInputAction: TextInputAction.search,
-            controller: TextEditingController(text: _search),
+            controller: _searchController,
             decoration: InputDecoration(
               hintText: 'Tìm kiếm sản phẩm',
               prefixIcon: const Icon(Icons.search),
-              suffixIcon: _search.isNotEmpty
+              suffixIcon: _searchController.text.isNotEmpty
                   ? IconButton(
                       tooltip: 'Xóa tìm kiếm',
                       icon: const Icon(Icons.clear),
@@ -258,10 +287,8 @@ class _MemberProductListScreenState extends ConsumerState<MemberProductListScree
                     )
                   : null,
             ),
-            onSubmitted: _onSearchChanged,
-            onChanged: (v) {
-              _onSearchChanged(v);
-            },
+            onSubmitted: _onSearchSubmitted,
+            onChanged: _onSearchChanged,
           ),
           const SizedBox(height: 12),
           SizedBox(
@@ -307,9 +334,7 @@ class _MemberProductListScreenState extends ConsumerState<MemberProductListScree
       child: ChoiceChip(
         label: Text(label),
         selected: _categoryId == id,
-        onSelected: _isLoadingProducts
-            ? null
-            : (_) => _onCategoryChanged(id),
+        onSelected: _isLoadingProducts ? null : (_) => _onCategoryChanged(id),
       ),
     );
   }
@@ -392,10 +417,13 @@ class _MemberProductListScreenState extends ConsumerState<MemberProductListScree
                         onTap: isOutOfStock
                             ? null
                             : () {
-                                ref.read(cartProvider.notifier).addItem(
-                                  CartItem(product: p, quantity: 1),
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        ProductDetailScreen(productId: p.id),
+                                  ),
                                 );
-                                showTopNotice(context, 'Đã thêm "${p.name}" vào giỏ hàng', duration: const Duration(seconds: 1));
                               },
                         borderRadius: BorderRadius.circular(20),
                         child: Padding(
@@ -405,7 +433,7 @@ class _MemberProductListScreenState extends ConsumerState<MemberProductListScree
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                Icons.add_shopping_cart,
+                                Icons.shopping_bag_outlined,
                                 size: 16,
                                 color: isOutOfStock
                                     ? scheme.surface
@@ -413,7 +441,7 @@ class _MemberProductListScreenState extends ConsumerState<MemberProductListScree
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                'Thêm',
+                                'Chọn mua',
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,

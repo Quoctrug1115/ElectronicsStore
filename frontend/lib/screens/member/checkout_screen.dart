@@ -9,6 +9,7 @@ import '../../providers/cart_provider.dart';
 import '../../services/order_service.dart';
 import '../home/member_home.dart';
 import 'order_history_screen.dart';
+import '../../widgets/top_notice.dart';
 
 class CheckoutScreen extends ConsumerStatefulWidget {
   const CheckoutScreen({super.key});
@@ -487,20 +488,17 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
         _confirmedTransfer = true;
         _isConfirming = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      showTopNotice(context, msg);
     } on Exception catch (e) {
       if (!mounted) return;
       setState(() => _isConfirming = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
-      );
+      showTopNotice(context, e.toString().replaceFirst('Exception: ', ''));
     }
   }
 
   void _copyText(String label, String text) {
     Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('Đã sao chép $label: $text')));
+    showTopNotice(context, 'Đã sao chép $label: $text');
   }
 
   @override
@@ -512,158 +510,170 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen> {
         order.vietQrUrl != null &&
         order.vietQrUrl!.isNotEmpty;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(isVietQr ? 'Thanh toán VietQR' : 'Đặt hàng thành công'),
-        automaticallyImplyLeading: false,
-      ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 440),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  isVietQr ? Icons.qr_code_scanner : Icons.check_circle_outline,
-                  size: isVietQr ? 64 : 96,
-                  color: theme.colorScheme.primary,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  isVietQr
-                      ? 'Quét mã VietQR để thanh toán'
-                      : 'Đặt hàng thành công!',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
+    // VietQR: phải bấm "Tôi đã chuyển khoản" xong mới được đi tiếp, không bỏ qua bước thanh toán.
+    final mustPay = isVietQr && !_confirmedTransfer;
+
+    return PopScope(
+      canPop: !mustPay,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(isVietQr ? 'Thanh toán VietQR' : 'Đặt hàng thành công'),
+          automaticallyImplyLeading: false,
+        ),
+        body: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isVietQr
+                        ? Icons.qr_code_scanner
+                        : Icons.check_circle_outline,
+                    size: isVietQr ? 64 : 96,
+                    color: theme.colorScheme.primary,
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Mã đơn hàng: ${order.orderCode}',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                  const SizedBox(height: 16),
+                  Text(
+                    isVietQr
+                        ? 'Quét mã VietQR để thanh toán'
+                        : 'Đặt hàng thành công!',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
-                if (isVietQr) ...[
-                  const SizedBox(height: 20),
-                  Card(
-                    elevation: 2,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.network(
-                              order.vietQrUrl!,
-                              width: 260,
-                              height: 300,
-                              fit: BoxFit.contain,
-                              loadingBuilder: (context, child, progress) {
-                                if (progress == null) return child;
-                                return const SizedBox(
-                                  width: 260,
-                                  height: 260,
+                  const SizedBox(height: 8),
+                  Text(
+                    'Mã đơn hàng: ${order.orderCode}',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  if (isVietQr) ...[
+                    const SizedBox(height: 20),
+                    Card(
+                      elevation: 2,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.network(
+                                order.vietQrUrl!,
+                                width: 260,
+                                height: 300,
+                                fit: BoxFit.contain,
+                                loadingBuilder: (context, child, progress) {
+                                  if (progress == null) return child;
+                                  return const SizedBox(
+                                    width: 260,
+                                    height: 260,
+                                    child: Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  );
+                                },
+                                errorBuilder: (_, _, _) => const SizedBox(
+                                  height: 140,
                                   child: Center(
-                                    child: CircularProgressIndicator(),
-                                  ),
-                                );
-                              },
-                              errorBuilder: (_, _, _) => const SizedBox(
-                                height: 140,
-                                child: Center(
-                                  child: Text(
-                                    'Không tải được ảnh QR. Vui lòng chuyển khoản thủ công bên dưới.',
+                                    child: Text(
+                                      'Không tải được ảnh QR. Vui lòng chuyển khoản thủ công bên dưới.',
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                          const Divider(height: 24),
-                          _buildTransferRow(
-                            'Ngân hàng',
-                            order.vietQr?.bankId ?? 'MB',
-                          ),
-                          _buildTransferRow(
-                            'Số tài khoản',
-                            order.vietQr?.accountNo ?? '0909123456',
-                            onCopy: () => _copyText(
+                            const Divider(height: 24),
+                            _buildTransferRow(
+                              'Ngân hàng',
+                              order.vietQr?.bankId ?? 'MB',
+                            ),
+                            _buildTransferRow(
                               'Số tài khoản',
                               order.vietQr?.accountNo ?? '0909123456',
+                              onCopy: () => _copyText(
+                                'Số tài khoản',
+                                order.vietQr?.accountNo ?? '0909123456',
+                              ),
                             ),
-                          ),
-                          _buildTransferRow(
-                            'Chủ tài khoản',
-                            order.vietQr?.accountName ?? 'ELECTRONICS STORE',
-                          ),
-                          _buildTransferRow(
-                            'Số tiền',
-                            formatVnd(order.totalAmount),
-                            isHighlight: true,
-                          ),
-                          _buildTransferRow(
-                            'Nội dung CK',
-                            order.orderCode,
-                            isHighlight: true,
-                            onCopy: () => _copyText(
-                              'Nội dung chuyển khoản',
+                            _buildTransferRow(
+                              'Chủ tài khoản',
+                              order.vietQr?.accountName ?? 'ELECTRONICS STORE',
+                            ),
+                            _buildTransferRow(
+                              'Số tiền',
+                              formatVnd(order.totalAmount),
+                              isHighlight: true,
+                            ),
+                            _buildTransferRow(
+                              'Nội dung CK',
                               order.orderCode,
+                              isHighlight: true,
+                              onCopy: () => _copyText(
+                                'Nội dung chuyển khoản',
+                                order.orderCode,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  FilledButton.icon(
-                    onPressed: (_isConfirming || _confirmedTransfer)
-                        ? null
-                        : _confirmTransferred,
-                    icon: Icon(
-                      _confirmedTransfer
-                          ? Icons.check
-                          : Icons.verified_outlined,
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      onPressed: (_isConfirming || _confirmedTransfer)
+                          ? null
+                          : _confirmTransferred,
+                      icon: Icon(
+                        _confirmedTransfer
+                            ? Icons.check
+                            : Icons.verified_outlined,
+                      ),
+                      label: Text(
+                        _confirmedTransfer
+                            ? 'Đã gửi xác nhận chuyển khoản'
+                            : 'Tôi đã chuyển khoản',
+                      ),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 50),
+                      ),
                     ),
-                    label: Text(
-                      _confirmedTransfer
-                          ? 'Đã gửi xác nhận chuyển khoản'
-                          : 'Tôi đã chuyển khoản',
+                  ],
+                  if (!mustPay) ...[
+                    const SizedBox(height: 16),
+                    FilledButton.tonalIcon(
+                      onPressed: () {
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => OrderHistoryScreen(),
+                          ),
+                          (route) => route.isFirst,
+                        );
+                      },
+                      icon: const Icon(Icons.receipt_long),
+                      label: const Text('Xem lịch sử đơn hàng'),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 48),
+                      ),
                     ),
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 50),
+                    const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(builder: (_) => MemberHome()),
+                          (route) => route.isFirst,
+                        );
+                      },
+                      child: const Text('Tiếp tục mua sắm'),
                     ),
-                  ),
+                  ],
                 ],
-                const SizedBox(height: 16),
-                FilledButton.tonalIcon(
-                  onPressed: () {
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(builder: (_) => OrderHistoryScreen()),
-                      (route) => route.isFirst,
-                    );
-                  },
-                  icon: const Icon(Icons.receipt_long),
-                  label: const Text('Xem lịch sử đơn hàng'),
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 48),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: () {
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(builder: (_) => MemberHome()),
-                      (route) => route.isFirst,
-                    );
-                  },
-                  child: const Text('Tiếp tục mua sắm'),
-                ),
-              ],
+              ),
             ),
           ),
         ),

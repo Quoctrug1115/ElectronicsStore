@@ -43,6 +43,27 @@ public class AdminOrdersController : ControllerBase
         ["Đã trả hàng"] = "Returned"
     };
 
+    // Luồng bắt buộc đi từng bước, không được nhảy cóc. Hủy chỉ được trước khi giao xong.
+    private static readonly Dictionary<string, string[]> AllowedTransitions = new()
+    {
+        ["Pending"] = new[] { "Confirmed", "Cancelled" },
+        ["Confirmed"] = new[] { "Processing", "Cancelled" },
+        ["Processing"] = new[] { "Shipped", "Cancelled" },
+        ["Shipped"] = new[] { "Delivered", "Cancelled" },
+        ["Delivered"] = new[] { "Returned" }
+    };
+
+    private static readonly Dictionary<string, string> StatusLabels = new()
+    {
+        ["Pending"] = "Chờ xác nhận",
+        ["Confirmed"] = "Đã xác nhận",
+        ["Processing"] = "Đang xử lý",
+        ["Shipped"] = "Đang giao",
+        ["Delivered"] = "Đã giao",
+        ["Cancelled"] = "Đã hủy",
+        ["Returned"] = "Đã trả hàng"
+    };
+
     private static readonly HashSet<string> TerminalStatuses = new(StringComparer.OrdinalIgnoreCase)
     {
         "Delivered", "Cancelled", "Returned"
@@ -247,13 +268,19 @@ public class AdminOrdersController : ControllerBase
         if (TerminalStatuses.Contains(oldStatus) && !(oldStatus == "Delivered" && newStatus == "Returned"))
             return BadRequest(new { message = $"Đơn hàng đã ở trạng thái '{oldStatus}', không thể cập nhật thêm." });
 
-        // Chặn nhảy cóc trực tiếp từ Pending sang Delivered mà chưa qua Shipped
-        if (oldStatus == "Pending" && newStatus == "Delivered")
-            return BadRequest(new { message = "Đơn hàng cần chuyển sang 'Đang giao' (Shipped) trước khi 'Hoàn thành' (Delivered)." });
-
-        // Chặn quay ngược trạng thái từ Shipped về Pending/Confirmed/Processing
-        if (oldStatus == "Shipped" && (newStatus == "Pending" || newStatus == "Confirmed" || newStatus == "Processing"))
-            return BadRequest(new { message = "Đơn hàng đang giao không thể quay lại trạng thái trước đó." });
+        // Chỉ cho đi đúng bước kế tiếp (hoặc Hủy), không nhảy cóc, không quay lui
+        if (!AllowedTransitions.TryGetValue(oldStatus, out var allowedNext) || !allowedNext.Contains(newStatus))
+        {
+            var oldLabel = StatusLabels.GetValueOrDefault(oldStatus, oldStatus);
+            var newLabel = StatusLabels.GetValueOrDefault(newStatus, newStatus);
+            var nextLabels = allowedNext == null
+                ? "không có"
+                : string.Join(", ", allowedNext.Select(x => $"'{StatusLabels.GetValueOrDefault(x, x)}'"));
+            return BadRequest(new
+            {
+                message = $"Không thể chuyển đơn từ '{oldLabel}' sang '{newLabel}'. Bước tiếp theo hợp lệ: {nextLabels}."
+            });
+        }
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
         try

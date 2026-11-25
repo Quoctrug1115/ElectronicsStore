@@ -148,12 +148,6 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     setState(() => _newImages.removeAt(index));
   }
 
-  String _existingImageUrl(ProductImage img) {
-    final base = 'http://localhost:5202';
-    if (img.imageUrl.isEmpty) return '';
-    return '$base${img.imageUrl}';
-  }
-
   Future<void> _save() async {
     FocusScope.of(context).unfocus();
     if (!_formKey.currentState!.validate()) return;
@@ -204,9 +198,12 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         );
       }
       if (!mounted) return;
-      showTopNotice(context, _isEdit
-                ? 'Cập nhật sản phẩm thành công.'
-                : 'Thêm sản phẩm thành công.');
+      showTopNotice(
+        context,
+        _isEdit
+            ? 'Cập nhật sản phẩm thành công.'
+            : 'Thêm sản phẩm thành công.',
+      );
       Navigator.of(context).pop(true);
     } on Exception catch (e) {
       if (!mounted) return;
@@ -363,7 +360,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       ),
                       validator: (value) {
                         final n = int.tryParse(value?.trim() ?? '');
-                        if (n == null || n < 0) return 'Vui lòng nhập số lượng tồn kho (>= 0)';
+                        if (n == null || n < 0) {
+                          return 'Vui lòng nhập số lượng tồn kho (>= 0)';
+                        }
                         if (n > 1000000) return 'Tồn kho tối đa 1.000.000';
                         return null;
                       },
@@ -434,7 +433,6 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                           itemCount: _existingImages.length,
                           itemBuilder: (_, i) {
                             final img = _existingImages[i];
-                            final url = _existingImageUrl(img);
                             return Container(
                               width: 80,
                               margin: const EdgeInsets.only(right: 8),
@@ -449,7 +447,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
                                 child: Image.network(
-                                  url,
+                                  img.fullImageUrl,
                                   fit: BoxFit.cover,
                                   width: 80,
                                   height: 80,

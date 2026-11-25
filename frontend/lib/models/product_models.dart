@@ -1,4 +1,5 @@
 import '../../core/api_config.dart';
+import '../core/format.dart';
 
 class PagedResult<T> {
   final List<T> items;
@@ -71,6 +72,21 @@ class ProductListItem {
     return '${ApiConfig.baseUrl}$primaryImageUrl';
   }
 
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'categoryId': categoryId,
+    'categoryName': categoryName,
+    'brandId': brandId,
+    'brandName': brandName,
+    'price': price,
+    'compareAtPrice': compareAtPrice,
+    'primaryImageUrl': primaryImageUrl,
+    'stockQuantity': stockQuantity,
+    'isActive': isActive,
+    'createdAt': createdAt.toUtc().toIso8601String(),
+  };
+
   factory ProductListItem.fromJson(Map<String, dynamic> json) => ProductListItem(
     id: (json['id'] as num).toInt(),
     name: json['name'] as String? ?? '',
@@ -83,7 +99,7 @@ class ProductListItem {
     primaryImageUrl: json['primaryImageUrl'] as String?,
     stockQuantity: (json['stockQuantity'] as num?)?.toInt() ?? 0,
     isActive: json['isActive'] as bool? ?? false,
-    createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
+    createdAt: parseServerDate(json['createdAt']) ??
         DateTime.now(),
   );
 }
@@ -138,6 +154,17 @@ class ProductVariant {
   /// Còn bán được: biến thể đang hoạt động và còn tồn kho.
   bool get inStock => isActive && stockQuantity > 0;
 
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'sku': sku,
+    'color': color,
+    'storage': storage,
+    'price': price,
+    'compareAtPrice': compareAtPrice,
+    'stockQuantity': stockQuantity,
+    'isActive': isActive,
+  };
+
   factory ProductVariant.fromJson(Map<String, dynamic> json) => ProductVariant(
     id: (json['id'] as num).toInt(),
     sku: json['sku'] as String? ?? '',
@@ -186,7 +213,7 @@ class ProductDetail {
     brandId: (json['brandId'] as num).toInt(),
     brandName: json['brandName'] as String? ?? '',
     isActive: json['isActive'] as bool? ?? false,
-    createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
+    createdAt: parseServerDate(json['createdAt']) ??
         DateTime.now(),
     images: (json['images'] as List<dynamic>? ?? [])
         .map((e) => ProductImage.fromJson(e as Map<String, dynamic>))

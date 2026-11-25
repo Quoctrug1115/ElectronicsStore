@@ -1,4 +1,5 @@
 import '../../core/api_config.dart';
+import '../core/format.dart';
 
 class CategoryResponse {
   final int id;
@@ -36,7 +37,7 @@ class CategoryResponse {
     description: json['description'] as String?,
     imageUrl: json['imageUrl'] as String?,
     isActive: json['isActive'] as bool? ?? false,
-    createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
+    createdAt: parseServerDate(json['createdAt']) ??
         DateTime.now(),
     productCount: (json['productCount'] as num?)?.toInt() ?? 0,
   );

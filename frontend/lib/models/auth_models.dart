@@ -1,3 +1,5 @@
+import '../core/format.dart';
+
 class RegisterRequest {
   final String fullName;
   final String email;
@@ -89,7 +91,7 @@ class AuthResponse {
     accessToken: json['accessToken'] as String,
     refreshToken: json['refreshToken'] as String? ?? '',
     expiresAt:
-        DateTime.tryParse(json['expiresAt']?.toString() ?? '') ??
+        parseServerDate(json['expiresAt']) ??
         DateTime.now(),
     user: UserInfo.fromJson(json['user'] as Map<String, dynamic>),
   );

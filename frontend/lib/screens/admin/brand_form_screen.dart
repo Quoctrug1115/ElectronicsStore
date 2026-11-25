@@ -27,7 +27,6 @@ class _BrandFormScreenState extends State<BrandFormScreen> {
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
 
-  bool _isLoading = true;
   bool _saving = false;
   String? _errorMessage;
   bool _isActive = true;
@@ -43,7 +42,14 @@ class _BrandFormScreenState extends State<BrandFormScreen> {
     _initForm();
   }
 
-  Future<void> _initForm() async {
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  void _initForm() {
     if (_isEdit) {
       final b = widget.brand!;
       _nameController.text = b.name;
@@ -104,7 +110,12 @@ class _BrandFormScreenState extends State<BrandFormScreen> {
         );
       }
       if (!mounted) return;
-      showTopNotice(context, _isEdit ? 'Cập nhật thương hiệu thành công.' : 'Thêm thương hiệu thành công.');
+      showTopNotice(
+        context,
+        _isEdit
+            ? 'Cập nhật thương hiệu thành công.'
+            : 'Thêm thương hiệu thành công.',
+      );
       Navigator.of(context).pop(true);
     } on Exception catch (e) {
       if (!mounted) return;
@@ -123,99 +134,96 @@ class _BrandFormScreenState extends State<BrandFormScreen> {
       appBar: AppBar(
         title: Text(_isEdit ? 'Sửa thương hiệu' : 'Thêm thương hiệu'),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      _isEdit ? 'Sửa thương hiệu' : 'Thêm thương hiệu mới',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    const SizedBox(height: 24),
-                    TextFormField(
-                      controller: _nameController,
-                      enabled: !_saving,
-                      decoration: const InputDecoration(
-                        labelText: 'Tên thương hiệu',
-                        prefixIcon: Icon(Icons.business),
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) =>
-                          (value == null || value.trim().isEmpty)
-                              ? 'Vui lòng nhập tên thương hiệu'
-                              : null,
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _descriptionController,
-                      enabled: !_saving,
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                        labelText: 'Mô tả',
-                        prefixIcon: Icon(Icons.description_outlined),
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Checkbox(
-                          value: _isActive,
-                          onChanged: _saving
-                              ? null
-                              : (v) => setState(() => _isActive = v ?? true),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Hoạt động',
-                          style: Theme.of(context).textTheme.bodyLarge,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Logo thương hiệu',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildLogoPicker(),
-                    const SizedBox(height: 16),
-                    FilledButton.icon(
-                      onPressed: _saving ? null : _pickLogo,
-                      icon: const Icon(Icons.image),
-                      label: Text(_pickedLogo == null
-                          ? 'Chọn logo'
-                          : 'Chọn ảnh khác'),
-                    ),
-                    if (_errorMessage != null) ...[
-                      const SizedBox(height: 16),
-                      ErrorBanner(message: _errorMessage!),
-                    ],
-                    const SizedBox(height: 24),
-                    FilledButton(
-                      onPressed: _saving ? null : _save,
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(52),
-                      ),
-                      child: _saving
-                          ? const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                              ),
-                            )
-                          : Text(_isEdit ? 'Cập nhật' : 'Thêm'),
-                    ),
-                  ],
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                _isEdit ? 'Sửa thương hiệu' : 'Thêm thương hiệu mới',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 24),
+              TextFormField(
+                controller: _nameController,
+                enabled: !_saving,
+                decoration: const InputDecoration(
+                  labelText: 'Tên thương hiệu',
+                  prefixIcon: Icon(Icons.business),
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) => (value == null || value.trim().isEmpty)
+                    ? 'Vui lòng nhập tên thương hiệu'
+                    : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _descriptionController,
+                enabled: !_saving,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Mô tả',
+                  prefixIcon: Icon(Icons.description_outlined),
+                  border: OutlineInputBorder(),
                 ),
               ),
-            ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Checkbox(
+                    value: _isActive,
+                    onChanged: _saving
+                        ? null
+                        : (v) => setState(() => _isActive = v ?? true),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Hoạt động',
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Logo thương hiệu',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 12),
+              _buildLogoPicker(),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: _saving ? null : _pickLogo,
+                icon: const Icon(Icons.image),
+                label: Text(
+                  _pickedLogo == null ? 'Chọn logo' : 'Chọn ảnh khác',
+                ),
+              ),
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 16),
+                ErrorBanner(message: _errorMessage!),
+              ],
+              const SizedBox(height: 24),
+              FilledButton(
+                onPressed: _saving ? null : _save,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(52),
+                ),
+                child: _saving
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                        ),
+                      )
+                    : Text(_isEdit ? 'Cập nhật' : 'Thêm'),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

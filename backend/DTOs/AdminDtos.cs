@@ -52,3 +52,31 @@ public class AdminOrderListItemDto
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
 }
+
+public class UserOrderSummaryDto
+{
+    public long Id { get; set; }
+    public string OrderCode { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public decimal TotalAmount { get; set; }
+    public string PaymentMethod { get; set; } = "COD";
+    public string PaymentStatus { get; set; } = "Pending";
+    public DateTime CreatedAt { get; set; }
+}
+
+/// <summary>Thông tin tài khoản + thống kê hoạt động, dùng cho màn chi tiết người dùng của Admin.</summary>
+public class AdminUserDetailDto : AdminUserDto
+{
+    public int OrderCount { get; set; }
+
+    /// <summary>Tổng tiền các đơn không bị Hủy / Trả hàng.</summary>
+    public decimal TotalSpent { get; set; }
+    public DateTime? LastOrderAt { get; set; }
+
+    /// <summary>Thời điểm đăng nhập gần nhất (lấy từ thời điểm tạo RefreshToken).</summary>
+    public DateTime? LastLoginAt { get; set; }
+    public int LoginCount { get; set; }
+    public int CartItemCount { get; set; }
+    public Dictionary<string, int> OrdersByStatus { get; set; } = new();
+    public List<UserOrderSummaryDto> RecentOrders { get; set; } = new();
+}

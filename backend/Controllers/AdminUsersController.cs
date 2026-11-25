@@ -92,6 +92,86 @@ public class AdminUsersController : ControllerBase
         return Ok(result);
     }
 
+    // 1b. CHI TIẾT NGƯỜI DÙNG: thông tin + hoạt động (đơn hàng, đăng nhập, giỏ hàng)
+    [HttpGet("{id:long}")]
+    public async Task<IActionResult> GetUserDetail(long id)
+    {
+        var user = await _context.Users
+            .AsNoTracking()
+            .Include(u => u.UserRoles)
+                .ThenInclude(ur => ur.Role)
+            .FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted);
+
+        if (user == null)
+            return NotFound(new { message = "Không tìm thấy người dùng." });
+
+        var orders = await _context.Orders
+            .AsNoTracking()
+            .Where(o => o.UserId == id)
+            .OrderByDescending(o => o.CreatedAt)
+            .Select(o => new
+            {
+                o.Id,
+                o.OrderCode,
+                o.Status,
+                o.TotalAmount,
+                o.CreatedAt,
+                Payment = o.Payments
+                    .OrderByDescending(p => p.CreatedAt)
+                    .Select(p => new { p.PaymentMethod, p.Status })
+                    .FirstOrDefault()
+            })
+            .ToListAsync();
+
+        var logins = await _context.RefreshTokens
+            .AsNoTracking()
+            .Where(t => t.UserId == id)
+            .GroupBy(t => t.UserId)
+            .Select(g => new { Count = g.Count(), Last = g.Max(t => t.CreatedAt) })
+            .FirstOrDefaultAsync();
+
+        var cartItemCount = await _context.CartItems
+            .Where(ci => ci.Cart.UserId == id)
+            .SumAsync(ci => (int?)ci.Quantity) ?? 0;
+
+        var roleNames = user.UserRoles.Select(ur => ur.Role.Name).ToList();
+
+        return Ok(new AdminUserDetailDto
+        {
+            Id = user.Id,
+            FullName = user.FullName,
+            Email = user.Email,
+            PhoneNumber = user.PhoneNumber,
+            EmailConfirmed = user.EmailConfirmed,
+            IsActive = user.IsActive,
+            LockoutEnd = user.LockoutEnd,
+            Role = roleNames.Contains("Admin") ? "Admin" : (roleNames.FirstOrDefault() ?? "Member"),
+            Roles = roleNames,
+            CreatedAt = user.CreatedAt,
+            OrderCount = orders.Count,
+            TotalSpent = orders
+                .Where(o => o.Status != "Cancelled" && o.Status != "Returned")
+                .Sum(o => o.TotalAmount),
+            LastOrderAt = orders.Count > 0 ? orders[0].CreatedAt : null,
+            LastLoginAt = logins?.Last,
+            LoginCount = logins?.Count ?? 0,
+            CartItemCount = cartItemCount,
+            OrdersByStatus = orders
+                .GroupBy(o => o.Status)
+                .ToDictionary(g => g.Key, g => g.Count()),
+            RecentOrders = orders.Take(5).Select(o => new UserOrderSummaryDto
+            {
+                Id = o.Id,
+                OrderCode = o.OrderCode,
+                Status = o.Status,
+                TotalAmount = o.TotalAmount,
+                PaymentMethod = o.Payment?.PaymentMethod ?? "COD",
+                PaymentStatus = o.Payment?.Status ?? "Pending",
+                CreatedAt = o.CreatedAt
+            }).ToList()
+        });
+    }
+
     // 2. KHÓA / MỞ KHÓA TÀI KHOẢN
     [HttpPut("{id:long}/toggle-lock")]
     public async Task<IActionResult> ToggleLock(long id)

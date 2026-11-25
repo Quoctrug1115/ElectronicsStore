@@ -1,8 +1,75 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../core/jwt_helper.dart';
+import '../core/token_storage.dart';
 import '../models/cart_models.dart';
+import '../models/product_models.dart';
+import '../services/local_cache.dart';
 
 class CartNotifier extends StateNotifier<Cart> {
   CartNotifier() : super(const Cart());
+
+  /// Chủ của giỏ đang hiển thị; null khi chưa nạp (chưa đăng nhập) nên chưa ghi xuống SQLite.
+  int? _userId;
+
+  // Ghi xuống SQLite tuần tự để các thay đổi liên tiếp không bị ghi đè sai thứ tự.
+  Future<void> _pendingWrite = Future.value();
+
+  /// Mọi thay đổi giỏ đều đi qua setter này: cập nhật bộ nhớ rồi lưu vào SQLite.
+  @override
+  set state(Cart value) {
+    super.state = value;
+    _persist(value);
+  }
+
+  void _persist(Cart cart) {
+    final userId = _userId;
+    if (userId == null) return;
+    final rows = [
+      for (final i in cart.items)
+        {
+          'productId': i.product.id,
+          'variantId': i.variant?.id ?? 0,
+          'quantity': i.quantity,
+          'product': i.product.toJson(),
+          'variant': i.variant?.toJson(),
+        },
+    ];
+    _pendingWrite = _pendingWrite.then((_) => LocalCache.saveCart(userId, rows));
+  }
+
+  /// Nạp giỏ của người dùng đang đăng nhập từ SQLite (gọi khi vào trang chủ của khách).
+  /// Thay thế hẳn giỏ trong bộ nhớ nên giỏ của tài khoản trước không lẫn sang tài khoản sau.
+  Future<void> loadForCurrentUser() async {
+    final token = await TokenStorage.getToken();
+    final userId = token == null ? null : JwtHelper.getUserId(token);
+    _userId = userId;
+    if (userId == null) {
+      super.state = const Cart();
+      return;
+    }
+    final rows = await LocalCache.loadCart(userId);
+    if (_userId != userId) return; // đã đổi tài khoản trong lúc nạp
+    final items = <CartItem>[];
+    for (final r in rows) {
+      try {
+        items.add(CartItem(
+          product: ProductListItem.fromJson(r['product'] as Map<String, dynamic>),
+          variant: r['variant'] == null
+              ? null
+              : ProductVariant.fromJson(r['variant'] as Map<String, dynamic>),
+          quantity: r['quantity'] as int,
+        ));
+      } catch (_) {}
+    }
+    super.state = Cart(items: items); // nạp từ DB: không cần ghi lại
+  }
+
+  /// Đăng xuất: bỏ giỏ khỏi bộ nhớ nhưng giữ nguyên trong SQLite để lần đăng nhập sau còn.
+  void resetInMemory() {
+    _userId = null;
+    super.state = const Cart();
+  }
 
   void addItem(CartItem item) {
     final existingIndex = state.items.indexWhere(

@@ -23,6 +23,19 @@ class JwtHelper {
     return [roles.toString()];
   }
 
+  /// Id người dùng trong JWT (claim `nameidentifier`, hoặc `sub`).
+  static int? getUserId(String token) {
+    final payload = decodePayload(token);
+    if (payload == null) return null;
+    for (final entry in payload.entries) {
+      final key = entry.key.toLowerCase();
+      if (key.endsWith('nameidentifier') || key == 'sub') {
+        return int.tryParse(entry.value.toString());
+      }
+    }
+    return null;
+  }
+
   static String _decodeBase64Url(String str) {
     var s = str.replaceAll('-', '+').replaceAll('_', '/');
     while (s.length % 4 != 0) {

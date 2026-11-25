@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/api_config.dart';
+import '../core/format.dart';
 
 class OrderItemRequest {
   final int productId;
@@ -58,12 +59,17 @@ class OrderResponse {
   final String shippingAddress;
   final String? note;
   final double totalAmount;
+  final double subtotal;
+  final double shippingFee;
   final String paymentMethod;
   final String paymentStatus;
   final String? vietQrUrl;
   final VietQrInfo? vietQr;
   final DateTime createdAt;
   final List<OrderItemResponse> items;
+  final List<OrderStatusEntry> statusHistory;
+  final String? customerName;
+  final String? customerEmail;
 
   const OrderResponse({
     required this.id,
@@ -74,13 +80,18 @@ class OrderResponse {
     required this.shippingAddress,
     this.note,
     required this.totalAmount,
+    double? subtotal,
+    this.shippingFee = 0,
     this.paymentMethod = 'COD',
     this.paymentStatus = 'Pending',
     this.vietQrUrl,
     this.vietQr,
     required this.createdAt,
     this.items = const [],
-  });
+    this.statusHistory = const [],
+    this.customerName,
+    this.customerEmail,
+  }) : subtotal = subtotal ?? totalAmount;
 
   factory OrderResponse.fromJson(Map<String, dynamic> json) {
     final total = (json['totalAmount'] as num?)?.toDouble() ?? 0.0;
@@ -91,13 +102,7 @@ class OrderResponse {
         ? VietQrInfo.fromJson(vietQrMap)
         : null;
 
-    String? qrUrl = json['vietQrUrl'] as String? ?? parsedVietQr?.qrImageUrl;
-    if ((qrUrl == null || qrUrl.isEmpty) && method.toLowerCase() == 'vietqr') {
-      final amountInt = total.round();
-      qrUrl =
-          'https://img.vietqr.io/image/MB-0909123456-compact2.png'
-          '?amount=$amountInt&addInfo=${Uri.encodeComponent(code)}&accountName=ELECTRONICS%20STORE';
-    }
+    final qrUrl = json['vietQrUrl'] as String? ?? parsedVietQr?.qrImageUrl;
 
     return OrderResponse(
       id: (json['id'] as num).toInt(),
@@ -108,60 +113,96 @@ class OrderResponse {
       shippingAddress: json['shippingAddress'] as String? ?? '',
       note: json['note'] as String?,
       totalAmount: total,
+      subtotal: (json['subtotal'] as num?)?.toDouble(),
+      shippingFee: (json['shippingFee'] as num?)?.toDouble() ?? 0,
       paymentMethod: method,
       paymentStatus: json['paymentStatus'] as String? ?? 'Pending',
       vietQrUrl: qrUrl,
       vietQr: parsedVietQr,
       createdAt:
-          DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
+          parseServerDate(json['createdAt']) ??
           DateTime.now(),
       items: (json['items'] as List<dynamic>? ?? [])
           .map((e) => OrderItemResponse.fromJson(e as Map<String, dynamic>))
           .toList(),
+      statusHistory: (json['statusHistory'] as List<dynamic>? ?? [])
+          .map((e) => OrderStatusEntry.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      customerName: json['customerName'] as String?,
+      customerEmail: json['customerEmail'] as String?,
     );
   }
-  // ... giữ nguyên statusDisplay và statusColor bên dưới
-  String get statusDisplay {
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return 'Chờ xác nhận';
-      case 'confirmed':
-        return 'Đã xác nhận';
-      case 'processing':
-        return 'Đang xử lý';
-      case 'shipped':
-      case 'shipping':
-        return 'Đang giao';
-      case 'delivered':
-        return 'Đã giao';
-      case 'cancelled':
-        return 'Đã hủy';
-      case 'returned':
-        return 'Đã trả hàng';
-      default:
-        return status;
-    }
-  }
 
-  Color get statusColor {
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return Colors.orange;
-      case 'confirmed':
-      case 'processing':
-        return Colors.blue;
-      case 'shipped':
-      case 'shipping':
-        return Colors.purple;
-      case 'delivered':
-        return Colors.green;
-      case 'cancelled':
-      case 'returned':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
+  String get statusDisplay => orderStatusLabel(status);
+
+  Color get statusColor => orderStatusColor(status);
+}
+
+String orderStatusLabel(String status) {
+  switch (status.toLowerCase()) {
+    case 'pending':
+      return 'Chờ xác nhận';
+    case 'confirmed':
+      return 'Đã xác nhận';
+    case 'processing':
+      return 'Đang xử lý';
+    case 'shipped':
+    case 'shipping':
+      return 'Đang giao';
+    case 'delivered':
+      return 'Đã giao';
+    case 'cancelled':
+      return 'Đã hủy';
+    case 'returned':
+      return 'Đã trả hàng';
+    default:
+      return status;
   }
+}
+
+Color orderStatusColor(String status) {
+  switch (status.toLowerCase()) {
+    case 'pending':
+      return Colors.orange;
+    case 'confirmed':
+    case 'processing':
+      return Colors.blue;
+    case 'shipped':
+    case 'shipping':
+      return Colors.purple;
+    case 'delivered':
+      return Colors.green;
+    case 'cancelled':
+    case 'returned':
+      return Colors.red;
+    default:
+      return Colors.grey;
+  }
+}
+
+/// Một dòng trong lịch sử đổi trạng thái của đơn.
+class OrderStatusEntry {
+  final String? oldStatus;
+  final String newStatus;
+  final String? note;
+  final DateTime createdAt;
+
+  const OrderStatusEntry({
+    this.oldStatus,
+    required this.newStatus,
+    this.note,
+    required this.createdAt,
+  });
+
+  factory OrderStatusEntry.fromJson(Map<String, dynamic> json) =>
+      OrderStatusEntry(
+        oldStatus: json['oldStatus'] as String?,
+        newStatus: json['newStatus'] as String? ?? '',
+        note: json['note'] as String?,
+        createdAt:
+            parseServerDate(json['createdAt']) ??
+            DateTime.now(),
+      );
 }
 
 class OrderItemResponse {

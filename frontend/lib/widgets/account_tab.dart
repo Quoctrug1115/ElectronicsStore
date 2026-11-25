@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/jwt_helper.dart';
 import '../core/token_storage.dart';
+import '../providers/cart_provider.dart';
 import '../screens/auth/change_password_screen.dart';
 import '../screens/auth/login_screen.dart';
+import '../screens/member/order_history_screen.dart';
+import 'top_notice.dart';
 
 class AccountTab extends StatefulWidget {
   const AccountTab({super.key, required this.isAdmin});
@@ -55,11 +59,7 @@ class _AccountTabState extends State<AccountTab> {
     final token = _token ?? await TokenStorage.getToken();
     if (!mounted) return;
     if (token == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Phiên đăng nhập đã hết, vui lòng đăng nhập lại.'),
-        ),
-      );
+      showTopNotice(context, 'Phiên đăng nhập đã hết, vui lòng đăng nhập lại.');
       return;
     }
     Navigator.of(context).push(
@@ -88,9 +88,12 @@ class _AccountTabState extends State<AccountTab> {
         ],
       ),
     );
-    if (ok != true) return;
+    if (ok != true || !mounted) return;
 
+    final container = ProviderScope.containerOf(context);
     await TokenStorage.clear();
+    // Bỏ giỏ khỏi bộ nhớ (vẫn còn trong SQLite cho lần đăng nhập sau).
+    container.read(cartProvider.notifier).resetInMemory();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -167,6 +170,19 @@ class _AccountTabState extends State<AccountTab> {
           Card(
             child: Column(
               children: [
+                if (!widget.isAdmin) ...[
+                  ListTile(
+                    leading: const Icon(Icons.receipt_long_outlined),
+                    title: const Text('Lịch sử đơn hàng'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const OrderHistoryScreen(),
+                      ),
+                    ),
+                  ),
+                  const Divider(height: 1, indent: 16, endIndent: 16),
+                ],
                 ListTile(
                   leading: const Icon(Icons.lock_outline),
                   title: const Text('Đổi mật khẩu'),

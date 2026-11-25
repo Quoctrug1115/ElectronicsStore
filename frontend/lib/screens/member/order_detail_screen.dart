@@ -1,15 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/format.dart';
 import '../../models/order_models.dart';
 import '../../services/order_service.dart';
+import '../../widgets/top_notice.dart';
 
 class OrderDetailScreen extends ConsumerStatefulWidget {
   final int orderId;
 
-  const OrderDetailScreen({super.key, required this.orderId});
+  /// true: Admin xem đơn (gọi API admin, có nút đổi trạng thái, không có hủy/QR của khách).
+  final bool admin;
+
+  const OrderDetailScreen({
+    super.key,
+    required this.orderId,
+    this.admin = false,
+  });
 
   @override
   ConsumerState<OrderDetailScreen> createState() => _OrderDetailScreenState();
@@ -20,7 +27,6 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
 
   OrderResponse? _order;
   bool _isLoading = true;
-  bool _isConfirmingPayment = false;
   String? _errorMessage;
 
   @override
@@ -35,7 +41,10 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
       _errorMessage = null;
     });
     try {
-      final order = await _orderService.getOrderById(widget.orderId);
+      final order = await _orderService.getOrderById(
+        widget.orderId,
+        admin: widget.admin,
+      );
       if (!mounted) return;
       setState(() {
         _order = order;
@@ -47,23 +56,6 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
         _isLoading = false;
         _errorMessage = e.toString().replaceFirst('Exception: ', '');
       });
-    }
-  }
-
-  Future<void> _confirmVietQrPayment() async {
-    setState(() => _isConfirmingPayment = true);
-    try {
-      final msg = await _orderService.confirmVietQrPayment(widget.orderId);
-      if (!mounted) return;
-      setState(() => _isConfirmingPayment = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-      await _loadOrder();
-    } on Exception catch (e) {
-      if (!mounted) return;
-      setState(() => _isConfirmingPayment = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
-      );
     }
   }
 
@@ -99,28 +91,20 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
       if (!mounted) return;
       await _loadOrder();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã hủy đơn hàng thành công')),
-      );
+      showTopNotice(context, 'Đã hủy đơn hàng thành công');
     } on Exception catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
-      );
+      showTopNotice(context, e.toString().replaceFirst('Exception: ', ''));
     }
-  }
-
-  void _copyText(String label, String text) {
-    Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('Đã sao chép $label: $text')));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Chi tiết đơn hàng')),
+      appBar: AppBar(
+        title: Text(widget.admin ? 'Quản lý đơn hàng' : 'Chi tiết đơn hàng'),
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
@@ -153,22 +137,10 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
 
   Widget _buildOrderDetail() {
     final order = _order!;
-    final showVietQr =
-        order.paymentMethod.toLowerCase() == 'vietqr' &&
-        order.paymentStatus.toLowerCase() != 'completed' &&
-        order.status.toLowerCase() != 'cancelled' &&
-        order.status.toLowerCase() != 'returned' &&
-        order.vietQrUrl != null &&
-        order.vietQrUrl!.isNotEmpty;
-
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         _buildStatusCard(order),
-        if (showVietQr) ...[
-          const SizedBox(height: 16),
-          _buildVietQrCard(order),
-        ],
         const SizedBox(height: 16),
         _buildInfoSection('Thông tin người nhận', [
           _InfoRow(
@@ -212,7 +184,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
           ),
           _InfoRow(
             label: 'Trạng thái thanh toán',
-            value: _paymentStatusLabel(order.paymentStatus),
+            value: _paymentStatusLabel(order.paymentStatus, order.paymentMethod),
             icon: Icons.account_balance_wallet_outlined,
             valueStyle: TextStyle(
               fontWeight: FontWeight.w600,
@@ -235,154 +207,16 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
         _buildItemsSection(order),
         const SizedBox(height: 16),
         _buildPriceSummary(order),
-        if (order.status.toLowerCase() == 'pending' ||
+        if (order.statusHistory.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          _buildHistoryCard(order),
+        ],
+        if (widget.admin)
+          _buildAdminActions(order)
+        else if (order.status.toLowerCase() == 'pending' ||
             order.status.toLowerCase() == 'confirmed')
           _buildCancelButton(),
       ],
-    );
-  }
-
-  Widget _buildVietQrCard(OrderResponse order) {
-    final theme = Theme.of(context);
-    final bankId = order.vietQr?.bankId ?? 'MB';
-    final accountNo = order.vietQr?.accountNo ?? '0909123456';
-    final accountName = order.vietQr?.accountName ?? 'ELECTRONICS STORE';
-
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.qr_code_2, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(
-                  'Thanh toán chuyển khoản VietQR',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                order.vietQrUrl!,
-                width: 240,
-                height: 280,
-                fit: BoxFit.contain,
-                loadingBuilder: (context, child, progress) {
-                  if (progress == null) return child;
-                  return const SizedBox(
-                    width: 240,
-                    height: 240,
-                    child: Center(child: CircularProgressIndicator()),
-                  );
-                },
-                errorBuilder: (_, _, _) => const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Text(
-                    'Không tải được ảnh QR. Vui lòng chuyển khoản theo thông tin bên dưới.',
-                  ),
-                ),
-              ),
-            ),
-            const Divider(height: 24),
-            _buildTransferRow('Ngân hàng', bankId),
-            _buildTransferRow(
-              'Số tài khoản',
-              accountNo,
-              onCopy: () => _copyText('Số tài khoản', accountNo),
-            ),
-            _buildTransferRow('Chủ tài khoản', accountName),
-            _buildTransferRow(
-              'Số tiền',
-              formatVnd(order.totalAmount),
-              isHighlight: true,
-            ),
-            _buildTransferRow(
-              'Nội dung CK',
-              order.orderCode,
-              isHighlight: true,
-              onCopy: () => _copyText('Nội dung chuyển khoản', order.orderCode),
-            ),
-            const SizedBox(height: 14),
-            FilledButton.icon(
-              onPressed: _isConfirmingPayment ? null : _confirmVietQrPayment,
-              icon: _isConfirmingPayment
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.verified_outlined),
-              label: const Text('Tôi đã chuyển khoản'),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(double.infinity, 46),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTransferRow(
-    String label,
-    String value, {
-    bool isHighlight = false,
-    VoidCallback? onCopy,
-  }) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 2,
-            child: Text(
-              label,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 3,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Flexible(
-                  child: Text(
-                    value,
-                    textAlign: TextAlign.right,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: isHighlight
-                          ? FontWeight.w700
-                          : FontWeight.w600,
-                      color: isHighlight ? theme.colorScheme.primary : null,
-                    ),
-                  ),
-                ),
-                if (onCopy != null)
-                  IconButton(
-                    icon: const Icon(Icons.copy, size: 18),
-                    tooltip: 'Sao chép',
-                    onPressed: onCopy,
-                    visualDensity: VisualDensity.compact,
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -399,7 +233,11 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
     }
   }
 
-  String _paymentStatusLabel(String status) {
+  String _paymentStatusLabel(String status, String method) {
+    // COD: tiền thu khi giao hàng; backend tự đánh dấu "Đã thanh toán" khi đơn chuyển sang "Đã giao".
+    if (method.toLowerCase() == 'cod' && status.toLowerCase() == 'pending') {
+      return 'Thanh toán khi nhận hàng';
+    }
     switch (status.toLowerCase()) {
       case 'completed':
         return 'Đã thanh toán';
@@ -723,11 +561,13 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            _PriceRow(label: 'Tạm tính', value: formatVnd(order.totalAmount)),
+            _PriceRow(label: 'Tạm tính', value: formatVnd(order.subtotal)),
             const SizedBox(height: 8),
             _PriceRow(
               label: 'Phí vận chuyển',
-              value: 'Miễn phí',
+              value: order.shippingFee > 0
+                  ? formatVnd(order.shippingFee)
+                  : 'Miễn phí',
               valueStyle: TextStyle(
                 fontWeight: FontWeight.w600,
                 color: theme.colorScheme.primary,
@@ -740,6 +580,183 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
               isTotal: true,
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHistoryCard(OrderResponse order) {
+    final theme = Theme.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Lịch sử trạng thái',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            for (final h in order.statusHistory)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.circle,
+                      size: 10,
+                      color: orderStatusColor(h.newStatus),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            orderStatusLabel(h.newStatus),
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          Text(
+                            formatDateTime(h.createdAt),
+                            style: theme.textTheme.bodySmall,
+                          ),
+                          if (h.note != null && h.note!.isNotEmpty)
+                            Text(h.note!, style: theme.textTheme.bodySmall),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Trạng thái Admin được chuyển tới từ trạng thái hiện tại: chỉ đúng bước kế tiếp
+  /// (và Hủy nếu còn được hủy), các bước xa hơn chưa hiện. Khớp luật của backend.
+  List<String> _nextStatuses(String current) {
+    switch (current.toLowerCase()) {
+      case 'pending':
+        return ['Confirmed', 'Cancelled'];
+      case 'confirmed':
+        return ['Processing', 'Cancelled'];
+      case 'processing':
+        return ['Shipped', 'Cancelled'];
+      case 'shipped':
+        return ['Delivered', 'Cancelled'];
+      case 'delivered':
+        return ['Returned'];
+      default:
+        return [];
+    }
+  }
+
+  Future<void> _changeStatus(String newStatus) async {
+    final noteController = TextEditingController();
+    final label = orderStatusLabel(newStatus);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Chuyển sang "$label"?'),
+        content: TextField(
+          controller: noteController,
+          maxLength: 500,
+          decoration: const InputDecoration(
+            labelText: 'Ghi chú (tùy chọn)',
+            counterText: '',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Không'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Xác nhận'),
+          ),
+        ],
+      ),
+    );
+    // Không dispose: hộp thoại còn chạy hoạt ảnh đóng và vẫn đọc controller này.
+    final note = noteController.text;
+    if (ok != true) return;
+
+    setState(() => _isLoading = true);
+    try {
+      final msg = await _orderService.updateOrderStatus(
+        widget.orderId,
+        newStatus,
+        note: note,
+      );
+      if (!mounted) return;
+      await _loadOrder();
+      if (!mounted) return;
+      showTopNotice(context, msg);
+    } on Exception catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      showTopNotice(context, e.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  Widget _buildAdminActions(OrderResponse order) {
+    final next = _nextStatuses(order.status);
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Cập nhật trạng thái',
+                style: Theme.of(context).textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 12),
+              if (order.customerName != null)
+                Text(
+                  'Khách: ${order.customerName} (${order.customerEmail ?? ''})',
+                ),
+              if (next.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Text('Đơn đã kết thúc, không thể đổi trạng thái.'),
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final st in next)
+                        st == 'Cancelled' || st == 'Returned'
+                            ? OutlinedButton(
+                                onPressed: () => _changeStatus(st),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: scheme.error,
+                                ),
+                                child: Text(orderStatusLabel(st)),
+                              )
+                            : FilledButton.tonal(
+                                onPressed: () => _changeStatus(st),
+                                child: Text(orderStatusLabel(st)),
+                              ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -766,11 +783,6 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
       color: theme.colorScheme.surfaceContainerHighest,
       child: Icon(Icons.devices, color: theme.colorScheme.outline, size: 24),
     );
-  }
-
-  String formatDateTime(DateTime date) {
-    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} '
-        '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 }
 
@@ -807,25 +819,31 @@ class _PriceRow extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: isTotal
-              ? theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                )
-              : theme.textTheme.bodyMedium,
+        Flexible(
+          child: Text(
+            label,
+            style: isTotal
+                ? theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  )
+                : theme.textTheme.bodyMedium,
+          ),
         ),
-        Text(
-          value,
-          style: isTotal
-              ? theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: theme.colorScheme.primary,
-                )
-              : valueStyle ??
-                    theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w500,
-                    ),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: isTotal
+                ? theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: theme.colorScheme.primary,
+                  )
+                : valueStyle ??
+                      theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+          ),
         ),
       ],
     );

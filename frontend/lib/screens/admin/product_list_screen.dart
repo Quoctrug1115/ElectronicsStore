@@ -8,7 +8,9 @@ import '../../services/category_service.dart';
 import '../../services/product_service.dart';
 import '../../core/format.dart';
 import '../../widgets/admin_widgets.dart';
+import '../../widgets/pagination_bar.dart';
 import 'product_form_screen.dart';
+import '../../widgets/top_notice.dart';
 
 class ProductListScreen extends StatefulWidget {
   const ProductListScreen({super.key});
@@ -19,7 +21,9 @@ class ProductListScreen extends StatefulWidget {
 
 class _ProductListScreenState extends State<ProductListScreen> {
   final ProductService _productService = ProductService(client: http.Client());
-  final CategoryService _categoryService = CategoryService(client: http.Client());
+  final CategoryService _categoryService = CategoryService(
+    client: http.Client(),
+  );
   final BrandService _brandService = BrandService(client: http.Client());
 
   PagedResult<ProductListItem>? _paged;
@@ -46,12 +50,14 @@ class _ProductListScreenState extends State<ProductListScreen> {
     });
     try {
       final futures = <Future>[];
-      futures.add(_productService.getProducts(
-        pageIndex: _pageIndex,
-        pageSize: _pageSize,
-        search: _search.isEmpty ? null : _search,
-        categoryId: _categoryId,
-      ));
+      futures.add(
+        _productService.getProducts(
+          pageIndex: _pageIndex,
+          pageSize: _pageSize,
+          search: _search.isEmpty ? null : _search,
+          categoryId: _categoryId,
+        ),
+      );
       futures.add(_categoryService.getCategories());
       final results = await Future.wait(futures);
       if (!mounted) return;
@@ -82,18 +88,11 @@ class _ProductListScreenState extends State<ProductListScreen> {
       await _productService.deleteProduct(id);
       if (!mounted) return;
       await _loadData(resetPage: false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Xóa sản phẩm thành công.')),
-      );
+      showTopNotice(context, 'Xóa sản phẩm thành công.');
     } on Exception catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString()),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
+      showTopNotice(context, e.toString(), isError: true);
     }
   }
 
@@ -124,16 +123,13 @@ class _ProductListScreenState extends State<ProductListScreen> {
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _errorMessage != null && _paged == null
-                      ? ListView(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          children: [
-                            ErrorRetry(
-                              message: _errorMessage!,
-                              onRetry: _loadData,
-                            ),
-                          ],
-                        )
-                      : _buildProductList(),
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                        ErrorRetry(message: _errorMessage!, onRetry: _loadData),
+                      ],
+                    )
+                  : _buildProductList(),
             ),
           ),
         ],
@@ -236,8 +232,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
   Widget _buildRow(ProductListItem p) {
     final scheme = Theme.of(context).colorScheme;
     final muted = scheme.onSurfaceVariant;
-    final hasDiscount =
-        p.compareAtPrice != null && p.compareAtPrice! > p.price;
+    final hasDiscount = p.compareAtPrice != null && p.compareAtPrice! > p.price;
 
     return Card(
       child: InkWell(
@@ -305,7 +300,9 @@ class _ProductListScreenState extends State<ProductListScreen> {
                       children: [
                         StatusPill(isActive: p.isActive),
                         Text(
-                          p.stockQuantity > 0 ? 'Tồn: ${p.stockQuantity}' : 'Hết hàng',
+                          p.stockQuantity > 0
+                              ? 'Tồn: ${p.stockQuantity}'
+                              : 'Hết hàng',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -337,52 +334,23 @@ class _ProductListScreenState extends State<ProductListScreen> {
   Widget _buildPagination() {
     final paged = _paged;
     if (paged == null) return const SizedBox.shrink();
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          top: BorderSide(
-            color: Theme.of(context).colorScheme.outlineVariant,
-          ),
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              'Trang ${paged.pageIndex}/${paged.totalPages} '
-              '(${paged.totalCount} sản phẩm)',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 13,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.chevron_left),
-            tooltip: 'Trang trước',
-            onPressed: (_isLoading || !paged.hasPreviousPage)
-                ? null
-                : () {
-                    setState(() => _pageIndex--);
-                    _loadData(resetPage: false);
-                  },
-          ),
-          IconButton(
-            icon: const Icon(Icons.chevron_right),
-            tooltip: 'Trang sau',
-            onPressed: (_isLoading || !paged.hasNextPage)
-                ? null
-                : () {
-                    setState(() => _pageIndex++);
-                    _loadData(resetPage: false);
-                  },
-          ),
-        ],
-      ),
+    return PaginationBar(
+      pageIndex: paged.pageIndex,
+      totalPages: paged.totalPages,
+      totalCount: paged.totalCount,
+      unit: 'sản phẩm',
+      onPrevious: (_isLoading || !paged.hasPreviousPage)
+          ? null
+          : () {
+              setState(() => _pageIndex--);
+              _loadData(resetPage: false);
+            },
+      onNext: (_isLoading || !paged.hasNextPage)
+          ? null
+          : () {
+              setState(() => _pageIndex++);
+              _loadData(resetPage: false);
+            },
     );
   }
 }

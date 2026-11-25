@@ -80,3 +80,29 @@ public class AdminUserDetailDto : AdminUserDto
     public Dictionary<string, int> OrdersByStatus { get; set; } = new();
     public List<UserOrderSummaryDto> RecentOrders { get; set; } = new();
 }
+
+public class DailyRevenueDto
+{
+    /// <summary>Ngày theo múi giờ của client, định dạng yyyy-MM-dd.</summary>
+    public string Date { get; set; } = string.Empty;
+    public decimal Revenue { get; set; }
+    public int Orders { get; set; }
+}
+
+/// <summary>Thống kê doanh thu cho màn Tổng quan của Admin. Doanh thu = tổng tiền các đơn đã giao (Delivered).</summary>
+public class RevenueStatsDto
+{
+    public decimal TotalRevenue { get; set; }
+    public int DeliveredOrders { get; set; }
+    public decimal TodayRevenue { get; set; }
+    public int TodayOrders { get; set; }
+    public decimal MonthRevenue { get; set; }
+    public int MonthOrders { get; set; }
+
+    /// <summary>Tổng tiền các đơn chưa giao xong (Chờ xác nhận, Đã xác nhận, Đang xử lý, Đang giao): doanh thu dự kiến.</summary>
+    public decimal InProgressRevenue { get; set; }
+    public int InProgressOrders { get; set; }
+    public int CancelledOrders { get; set; }
+    public Dictionary<string, int> OrdersByStatus { get; set; } = new();
+    public List<DailyRevenueDto> DailyRevenue { get; set; } = new();
+}

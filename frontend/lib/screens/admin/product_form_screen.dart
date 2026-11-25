@@ -12,6 +12,7 @@ import '../../services/brand_service.dart';
 import '../../services/category_service.dart';
 import '../../services/product_service.dart';
 import '../../widgets/error_banner.dart';
+import '../../widgets/top_notice.dart';
 
 class ProductFormScreen extends StatefulWidget {
   const ProductFormScreen({
@@ -203,15 +204,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         );
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _isEdit
+      showTopNotice(context, _isEdit
                 ? 'Cập nhật sản phẩm thành công.'
-                : 'Thêm sản phẩm thành công.',
-          ),
-        ),
-      );
+                : 'Thêm sản phẩm thành công.');
       Navigator.of(context).pop(true);
     } on Exception catch (e) {
       if (!mounted) return;

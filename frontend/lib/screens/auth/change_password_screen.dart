@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/auth_models.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/error_banner.dart';
+import '../../widgets/top_notice.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({
@@ -56,8 +57,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         accessToken: widget.accessToken,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
+      showTopNotice(context, message);
       Navigator.of(context).maybePop();
     } on ApiException catch (e) {
       if (mounted) setState(() => _errorMessage = e.message);

@@ -5,6 +5,7 @@ import '../../models/brand_models.dart';
 import '../../services/brand_service.dart';
 import '../../widgets/admin_widgets.dart';
 import 'brand_form_screen.dart';
+import '../../widgets/top_notice.dart';
 
 class BrandListScreen extends StatefulWidget {
   const BrandListScreen({super.key});
@@ -62,18 +63,11 @@ class _BrandListScreenState extends State<BrandListScreen> {
       await _brandService.deleteBrand(id);
       if (!mounted) return;
       await _loadBrands();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Xóa thương hiệu thành công.')),
-      );
+      showTopNotice(context, 'Xóa thương hiệu thành công.');
     } on Exception catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString()),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
+      showTopNotice(context, e.toString(), isError: true);
     }
   }
 

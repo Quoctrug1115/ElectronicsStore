@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../models/brand_models.dart';
 import '../../services/brand_service.dart';
 import '../../widgets/error_banner.dart';
+import '../../widgets/top_notice.dart';
 
 class BrandFormScreen extends StatefulWidget {
   const BrandFormScreen({
@@ -103,13 +104,7 @@ class _BrandFormScreenState extends State<BrandFormScreen> {
         );
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _isEdit ? 'Cập nhật thương hiệu thành công.' : 'Thêm thương hiệu thành công.',
-          ),
-        ),
-      );
+      showTopNotice(context, _isEdit ? 'Cập nhật thương hiệu thành công.' : 'Thêm thương hiệu thành công.');
       Navigator.of(context).pop(true);
     } on Exception catch (e) {
       if (!mounted) return;

@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../models/category_models.dart';
 import '../../services/category_service.dart';
 import '../../widgets/error_banner.dart';
+import '../../widgets/top_notice.dart';
 
 class CategoryFormScreen extends StatefulWidget {
   const CategoryFormScreen({
@@ -124,13 +125,7 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
         );
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _isEdit ? 'Cập nhật danh mục thành công.' : 'Thêm danh mục thành công.',
-          ),
-        ),
-      );
+      showTopNotice(context, _isEdit ? 'Cập nhật danh mục thành công.' : 'Thêm danh mục thành công.');
       Navigator.of(context).pop(true);
     } on Exception catch (e) {
       if (!mounted) return;

@@ -5,6 +5,7 @@ import '../../models/category_models.dart';
 import '../../services/category_service.dart';
 import '../../widgets/admin_widgets.dart';
 import 'category_form_screen.dart';
+import '../../widgets/top_notice.dart';
 
 class CategoryListScreen extends StatefulWidget {
   const CategoryListScreen({super.key});
@@ -64,18 +65,11 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
       await _categoryService.deleteCategory(id);
       if (!mounted) return;
       await _loadCategories();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Xóa danh mục thành công.')),
-      );
+      showTopNotice(context, 'Xóa danh mục thành công.');
     } on Exception catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString()),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
+      showTopNotice(context, e.toString(), isError: true);
     }
   }
 
